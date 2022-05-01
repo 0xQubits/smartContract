@@ -718,34 +718,6 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "portion",
-						"type": "uint256"
-					},
-					{
-						"internalType": "bytes32",
-						"name": "original_token_hash",
-						"type": "bytes32"
-					}
-				],
-				"name": "safeMintDividedToken",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "from",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "to",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
 						"name": "tokenId",
 						"type": "uint256"
 					}
@@ -959,11 +931,11 @@
 	},
 	"sources": {
 		"contracts/BitToken.sol": {
-			"keccak256": "0x6709d180130959a0840847e0236009df75082c966fd748e552a8a3cb2536d4d4",
+			"keccak256": "0x23baa83eb17753e8d088c212ae29332792f8c464ee2cd8377248b5c823efdca1",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://a70d391865f1d53ec95e8d1024efda7ca01cfbff85f8d7d78ef2523ae525a24b",
-				"dweb:/ipfs/QmceA9LiEZgzfpYV83HuqN5v4wtPrPsgZ2KnUM11TmMGx2"
+				"bzz-raw://b087573b9b3f245b0ab6f24e86be152643ddd991603287c07cc9eea05d637b51",
+				"dweb:/ipfs/QmVNdJ3CdZd2FfJhUyA4eqRJMrfp5fvMULWomea4xWb2vC"
 			]
 		},
 		"https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.5.0/contracts/access/AccessControl.sol": {

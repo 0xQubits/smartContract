@@ -62,7 +62,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             address to,
             uint256 portion,
             bytes32 original_token_hash
-        ) public {
+        ) private {
         
 
         uint256 tokenId = _tokenIdCounter.current();

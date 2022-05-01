@@ -86,11 +86,11 @@
 	},
 	"sources": {
 		"contracts/BitToken.sol": {
-			"keccak256": "0x6709d180130959a0840847e0236009df75082c966fd748e552a8a3cb2536d4d4",
+			"keccak256": "0x23baa83eb17753e8d088c212ae29332792f8c464ee2cd8377248b5c823efdca1",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://a70d391865f1d53ec95e8d1024efda7ca01cfbff85f8d7d78ef2523ae525a24b",
-				"dweb:/ipfs/QmceA9LiEZgzfpYV83HuqN5v4wtPrPsgZ2KnUM11TmMGx2"
+				"bzz-raw://b087573b9b3f245b0ab6f24e86be152643ddd991603287c07cc9eea05d637b51",
+				"dweb:/ipfs/QmVNdJ3CdZd2FfJhUyA4eqRJMrfp5fvMULWomea4xWb2vC"
 			]
 		},
 		"https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.5.0/contracts/access/AccessControl.sol": {
@@ -230,11 +230,11 @@
 			]
 		},
 		"tests/BitToken_test.sol": {
-			"keccak256": "0x38bdeeb960aeb3a12b3be0d8adeeb5144cffb729b8ec7f8128687cff15edcf13",
+			"keccak256": "0xbd6e6d77a565b35d6f1921b190c02d6a3ba735724503c5039bb2e4507bd77bed",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://29499f4cf17dc34c41d8fd713e3b35ce6f9aa56a385133d2290653e085458104",
-				"dweb:/ipfs/QmUmvEsmnup2MxCfbGxm8N8ozL5kjhjJDbfoBL2maDYGPH"
+				"bzz-raw://afb428b83670c74f92b088ecc989054d345710ae35ff39ba419ebc0736e20ea4",
+				"dweb:/ipfs/QmU4LQQorCiHUr5GzqPQbRat9tCd3jYcZZ4518rCpqD4R3"
 			]
 		}
 	},
