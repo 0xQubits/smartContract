@@ -53,14 +53,16 @@ describe("Split", function () {
         // ensure that it is sent to the intended new owners 
         let new_owners = [owner.address,addr1.address,addr2.address,addr3.address]
         let new_owners_portion = [
-            4 * 10 ** 11,
+            1 * 10 ** 11,
             3 * 10 ** 11,
             2 * 10 ** 11,
-            1 * 10 ** 11,
+            4 * 10 ** 11,
         ]
         
         let divisionTx = await bitToken.divideToken(0,new_owners,new_owners_portion);
-        await divisionTx.wait()
+        res = await divisionTx.wait()
+        console.log(res.events)
+        
 
         let divided_token = await bitToken.getDividedToken(0); 
         expect(divided_token.has_been_altered, true, "The first divided token should now be altered");
@@ -84,17 +86,18 @@ describe("Split", function () {
         // ensure that it is sent to the intended new owners 
         let new_owners = [owner.address,addr1.address]
         let new_owners_portion = [5 * 10 ** 10,5 * 10 ** 10]
-        
-        let divisionTx = await bitToken.divideToken(0,new_owners,new_owners_portion);
+        owners_token_id = 1
+        let divisionTx = await bitToken.divideToken(owners_token_id,new_owners,new_owners_portion);
         await divisionTx.wait()
 
-        let divided_token = await bitToken.getDividedToken(0); 
+
+        let divided_token = await bitToken.getDividedToken(owners_token_id); 
         expect(divided_token.has_been_altered, true, "The first divided token should now be altered");
 
         for (i=5; i < 7 ;i++){
             let new_divided_token = await bitToken.getDividedToken(i);
-            expect(new_divided_token.owner).to.equal(new_owners[i-1])
-            expect(new_divided_token.portion).to.equal(new_owners_portion[i-1]);
+            expect(new_divided_token.owner).to.equal(new_owners[i-5])
+            expect(new_divided_token.portion).to.equal(new_owners_portion[i-5]);
             expect(new_divided_token.has_been_altered).to.equal(false);
 
         }
