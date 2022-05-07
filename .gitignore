@@ -1,1 +1,4 @@
 node_modules
+.deps
+artifacts/
+cache/
