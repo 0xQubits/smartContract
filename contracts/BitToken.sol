@@ -53,33 +53,38 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
 
 
 
-    function safeMintToken(
+    function mintToken(
             address from,
             address to,
             uint portion,
             bytes32 externalTokenHash
         ) private returns (uint){
-        
 
+        // actual mint
+        uint tokenId = _tokenIdCounter.current();
+        // using safeMint can lead to having unexpected behaviour
+        // if mintToken func is called from a loop and
+        // one of the receivers cannot receive the token
+        _mint(to, tokenId); 
+        _tokenIdCounter.increment();
+
+        
+        // create token object and add it 
+        // to the array of existing tokens
         Token memory token;
         token.owner = to;
         token.portion = portion;
         token.externalTokenHash = externalTokenHash;
         TokenArr.push(token);
         
-        uint tokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
-        _safeMint(to, tokenId);
+        
+        // add transaction to history
         ExternalToken storage externalToken;
         externalToken = ExternalTokenMap[externalTokenHash];
         externalToken.historyArr.push(tokenId);
 
-        emit OwnershipModified(
-            from,
-            to,
-            externalToken.tokenId,
-            portion
-        );
+        emit OwnershipModified(from,to,externalToken.tokenId,portion);
+
         return tokenId;
 
     }
@@ -110,8 +115,9 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
 
             uint total = 0;
             for (uint i=0;i < _new_owners.length;i++){
+                require(_new_owners[i] != address(0),"There is an invalid recepient address");
                 require(_new_owners_portion[i] <= token.portion,"You can't transfer more than 100% of your holding");
-                total = total + _new_owners_portion[i];
+                total += _new_owners_portion[i];
             }
             require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
 
@@ -122,7 +128,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
 
             for (uint i=0;i < _new_owners.length;i++){
                 uint new_token_id;
-                new_token_id =safeMintToken(
+                new_token_id =mintToken(
                       token.owner,
                      _new_owners[i],
                      _new_owners_portion[i],
@@ -181,7 +187,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         return externalToken.activeTokenIdsArr;
     }
 
-    function getActiveTokens(
+    function getActiveTokenArr(
         bytes32 externalTokenHash
     ) public view returns (Token[] memory) {
         ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash];
@@ -275,7 +281,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
 
         uint[] memory new_divided_token_ids = new uint[](1);
         uint new_divided_token_id;
-        new_divided_token_id = safeMintToken(
+        new_divided_token_id = mintToken(
             externalToken.sender,
             externalToken.sender,
             TOTAL,

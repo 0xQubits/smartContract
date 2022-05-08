@@ -56,7 +56,7 @@ describe("Initialization", function () {
         expect(dividedToken.hasBeenAltered).to.equal(false);
 
         let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
-        let activeTokens = await bitToken.getActiveTokens(hash_value)
+        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         
         testTotal(activeTokens)
     });  
@@ -98,7 +98,7 @@ describe("Split", function () {
 
         }
         let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
-        let activeTokens = await bitToken.getActiveTokens(hash_value)
+        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         testTotal(activeTokens)
 
     });
@@ -128,7 +128,7 @@ describe("Split", function () {
 
         }
         let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
-        let activeTokens = await bitToken.getActiveTokens(hash_value)
+        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         testTotal(activeTokens)
 
     });
