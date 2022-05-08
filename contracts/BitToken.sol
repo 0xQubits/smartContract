@@ -7,28 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-
+import "hardhat/console.sol";
 
 contract BitToken is ERC721,IERC721Receiver, AccessControl {
-    using Counters for Counters.Counter;
-
-    uint public constant DECIMAL = uint(12);
-    uint public constant TOTAL = uint(10)**DECIMAL;
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    Counters.Counter private _tokenIdCounter;
-
-
     
-    
-    struct Token {
-        address owner;
-        uint portion;
-        bool hasBeenAltered;
-        bytes32 externalTokenHash;
-
-    }
-    Token[] public TokenArr;
-
+    // struct and variables
     struct ExternalToken {
         address sender;
         address contract_;
@@ -37,13 +20,27 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         uint[] activeTokenIdsArr;
 
     }
-    mapping(bytes32 => ExternalToken) public ExternalTokenMap;
 
-    event ReceivedExternalToken(address sender ,address operator, address from,uint tokenId,bytes32 hash_value );
+    struct Token {
+        address owner;
+        uint portion;
+        bool hasBeenAltered;
+        bytes32 externalTokenHash;
+    }
+
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
+    uint public constant DECIMAL = uint(12);
+    uint public constant TOTAL = uint(10)**DECIMAL;
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    mapping(bytes32 => ExternalToken) public ExternalTokenMap;
+    Token[] public TokenArr;
+
+
+    // Events
+    event ReceivedExternalToken(address sender ,address operator, address from,uint tokenId,bytes32 externalTokenHash );
     event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
 
-
-    
 
     
     constructor() ERC721("MyToken", "MTK") {
@@ -77,16 +74,17 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         token.externalTokenHash = externalTokenHash;
         TokenArr.push(token);
         
-        
         // add transaction to history
         ExternalToken storage externalToken;
         externalToken = ExternalTokenMap[externalTokenHash];
         externalToken.historyArr.push(tokenId);
 
+        assert(externalToken.contract_ != address(0));
+        
+
+
         emit OwnershipModified(from,to,externalToken.tokenId,portion);
-
         return tokenId;
-
     }
 
     
@@ -152,8 +150,8 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         address _contract,
         uint _tokenId
     ) public view returns (ExternalToken memory){
-        bytes32 hash_value = makeExternalTokenHash(_contract, _tokenId);
-        return ExternalTokenMap[hash_value];
+        bytes32 externalTokenHash = makeExternalTokenHash(_contract, _tokenId);
+        return ExternalTokenMap[externalTokenHash];
     }
 
 
@@ -250,12 +248,13 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             require(token.hasBeenAltered == false,"One token has already been altered ");
             expected_total += token.portion;
         }
-        require(expected_total==TOTAL,"You must have 100% ownership of the NFT in order to perform this function");
 
-        ERC721 nft = ERC721(externalToken.contract_);
-        nft.transferFrom(address(this),msg.sender,externalToken.tokenId);
+        assert(expected_total==TOTAL);
 
-        // make sure they they can't be used to send back token twice 
+        ERC721 externalTokenContract = ERC721(externalToken.contract_);
+        externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
+
+        // make sure tokens can't be reused
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             Token storage token = TokenArr[activeTokenIdsArr[i]];
             token.hasBeenAltered = true;            
@@ -272,12 +271,13 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         bytes memory
     ) public virtual override returns (bytes4) {
 
-    // check that token has not previoudly been assigned
         ExternalToken memory externalToken;
         externalToken.contract_ = msg.sender;
         externalToken.sender = from;
         externalToken.tokenId = tokenId;
-        bytes32 hash_value = makeExternalTokenHash(msg.sender, tokenId);
+        bytes32 externalTokenHash = makeExternalTokenHash(msg.sender, tokenId);
+        // set this so that the mintToken can access it
+        ExternalTokenMap[externalTokenHash] = externalToken;
 
         uint[] memory new_divided_token_ids = new uint[](1);
         uint new_divided_token_id;
@@ -285,21 +285,23 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             externalToken.sender,
             externalToken.sender,
             TOTAL,
-            hash_value
-            );
+            externalTokenHash
+        );
+
         
         new_divided_token_ids[0] = new_divided_token_id;
-        externalToken.activeTokenIdsArr = new_divided_token_ids;
+        ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
+        externalTokenRefreshed.activeTokenIdsArr = new_divided_token_ids;
+        
 
 
-        ExternalTokenMap[hash_value] = externalToken;
-        emit ReceivedExternalToken(msg.sender,operator,from, tokenId,hash_value);
+
+        emit ReceivedExternalToken(msg.sender,operator,from, tokenId,externalTokenHash);
 
         return this.onERC721Received.selector;
     }
 
 
-    // The following functions are overrides required by Solidity.
 
     function supportsInterface(bytes4 interfaceId)
         public

@@ -1,5 +1,5 @@
-// This document does not not showcase my 
-// system design, modularity or abstraction skills
+// This document does not in any way showcase my 
+// modularity or abstraction or organizational skills
 // I'm just testing stuff out
 const { expect } = require("chai");
 
@@ -45,20 +45,21 @@ describe("Initialization", function () {
         expect(await game.ownerOf(1)).to.equal(bitToken.address);
 
     
-        let originalToken = await bitToken.getExternalToken(game.address,1);
-        expect(originalToken.contract_ ).to.equal(game.address);
-        expect(originalToken.sender ).to.equal(owner.address);
+        
+        // expect(externalToken.contract_ ).to.equal(game.address);
+        // expect(externalToken.sender ).to.equal(owner.address);
 
 
-        let dividedToken = await bitToken.getToken(0);
-        expect(dividedToken.owner).to.equal(owner.address);
-        expect(dividedToken.portion).to.equal(10**12);
-        expect(dividedToken.hasBeenAltered).to.equal(false);
+        let token = await bitToken.getToken(0);
+        expect(token.owner).to.equal(owner.address);
+        expect(token.portion).to.equal(10**12);
+        expect(token.hasBeenAltered).to.equal(false);
 
         let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
         let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         
         testTotal(activeTokens)
+        
     });  
 });
 
@@ -69,6 +70,8 @@ describe("Split", function () {
     it("Should send percentage of the original token to new owners", async function () {
         // Ensure that the NFT can be further divided
         // ensure that it is sent to the intended new owners 
+        let externalToken = await bitToken.getExternalToken(game.address,1);
+        console.log(externalToken)
         let new_owners = [owner.address,
             addr1.address,
             addr2.address,
@@ -100,6 +103,7 @@ describe("Split", function () {
         let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
         let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         testTotal(activeTokens)
+        
 
     });
 
