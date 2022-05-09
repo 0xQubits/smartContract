@@ -10,6 +10,7 @@ let addr1;
 let addr2;
 let addr3;
 let addrs;
+let gameTokenId;
 before(async function () {
     
     [owner, addr1, addr2,addr3, ...addrs] = await ethers.getSigners();
@@ -23,7 +24,8 @@ before(async function () {
 
     const mintGameTx = await game.awardItem(owner.address);
     await mintGameTx.wait();
-    expect(await game.ownerOf(1)).to.equal(owner.address);
+    gameTokenId = 0;
+    expect(await game.ownerOf(gameTokenId)).to.equal(owner.address);
   });
 
 let testTotal  = (activeTokens)=> {
@@ -39,23 +41,23 @@ describe("Initialization", function () {
     it("Should send a token representing 100% ownership to the NFT sender when it receives an NFT", async function () {
         // Ensure that the NFT can be sent to the BitToken contract
         // and 100% ownership is originally assigned to the sender of the NFT
-        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](owner.address,bitToken.address,1);
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](owner.address,bitToken.address,gameTokenId);
         await safeTransferTx.wait()
 
-        expect(await game.ownerOf(1)).to.equal(bitToken.address);
+        expect(await game.ownerOf(gameTokenId)).to.equal(bitToken.address);
 
     
-        
-        // expect(externalToken.contract_ ).to.equal(game.address);
-        // expect(externalToken.sender ).to.equal(owner.address);
+        let externalToken = await bitToken.getExternalToken(game.address,gameTokenId);
+        expect(externalToken.contract_ ).to.equal(game.address);
+        expect(externalToken.sender ).to.equal(owner.address);
 
 
         let token = await bitToken.getToken(0);
         expect(token.owner).to.equal(owner.address);
-        expect(token.portion).to.equal(10**12);
+        expect(token.portion).to.equal(10**12); 
         expect(token.hasBeenAltered).to.equal(false);
 
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
+        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
         let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         
         testTotal(activeTokens)
@@ -70,8 +72,6 @@ describe("Split", function () {
     it("Should send percentage of the original token to new owners", async function () {
         // Ensure that the NFT can be further divided
         // ensure that it is sent to the intended new owners 
-        let externalToken = await bitToken.getExternalToken(game.address,1);
-        console.log(externalToken)
         let new_owners = [owner.address,
             addr1.address,
             addr2.address,
@@ -100,7 +100,7 @@ describe("Split", function () {
             expect(new_divided_token.hasBeenAltered).to.equal(false);
 
         }
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
+        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
         let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         testTotal(activeTokens)
         
@@ -131,9 +131,11 @@ describe("Split", function () {
             expect(new_divided_token.hasBeenAltered).to.equal(false);
 
         }
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,1)
+        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
         let activeTokens = await bitToken.getActiveTokenArr(hash_value)
         testTotal(activeTokens)
+        let externalToken = await bitToken.getExternalToken(game.address,gameTokenId);
+        console.log(externalToken)
 
     });
 
