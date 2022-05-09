@@ -34,6 +34,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         uint portion;
         bool hasBeenAltered;
         bytes32 externalTokenHash;
+        uint parentId;
     }
 
     using Counters for Counters.Counter;
@@ -48,13 +49,12 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-
     // Events
     event InitializedExternalToken(address contract_ ,address sender, uint tokenId);
     event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
-
-
     
+
+
     constructor() ERC721("BitToken", "BIT") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -67,7 +67,8 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             address from,
             address to,
             uint portion,
-            bytes32 externalTokenHash
+            bytes32 externalTokenHash,
+            uint parentId
         ) private returns (uint){
         // This is a private function for token mint
         ExternalToken storage externalToken;
@@ -90,7 +91,9 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         Token memory token;
         token.owner = to;
         token.portion = portion;
+        token.hasBeenAltered = false;
         token.externalTokenHash = externalTokenHash;
+        token.parentId = parentId;
         TokenArr.push(token);
         
         // add transaction to history
@@ -148,7 +151,8 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
                       token.owner,
                      _new_owners[i],
                      _new_owners_portion[i],
-                     token.externalTokenHash
+                     token.externalTokenHash,
+                     _tokenId
                 );
                 newDividedTokenIds[i] = new_token_id;
             }
@@ -303,6 +307,13 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         return true;
     }
 
+
+
+
+
+
+
+
     function initializeExternalToken(
         address contract_, 
         address sender,
@@ -323,7 +334,9 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
 
         uint[] memory newDividedTokenIds = new uint[](1);
         uint newDividedTokenId;
-        newDividedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash);
+        // uint parentId = 2 ^ 256 - 1;
+        uint MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        newDividedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash,MAX_INT);
         
         newDividedTokenIds[0] = newDividedTokenId;
         ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
@@ -335,29 +348,6 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
 
 
 
-    // function manualInitialization(
-    //     address contract_,
-    //     uint tokenId
-    // ) public {
-    //     ERC721 externalTokenContract = ERC721(contract_);
-        ////////////////////////////////////////////////////////////
-        //// I don't have a way to determine who sent the token ////
-        //// so this feature is paused                          ////
-        ////////////////////////////////////////////////////////////
-
-    //     //First check. This contract must own the token in question
-    //     assert(externalTokenContract.ownerOf(tokenId)==address(this));
-    //     bytes32 externalTokenHash = makeExternalTokenHash(contract_, tokenId);
-    //     ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
-    //     //Second Check. Make sure the token 
-    //     //has been been previously initialized
-    //     assert(externalToken.contract_ == address(0));
-    //     initializeExternalToken(contract_,msg.sender,tokenId,externalTokenHash);
-
-        
-        
-    // }
-
 
     function onERC721Received(
         address operator,
@@ -367,15 +357,8 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     ) public virtual override returns (bytes4) {
 
         bytes32 externalTokenHash = makeExternalTokenHash(msg.sender, tokenId);
+        initializeExternalToken(msg.sender,from,tokenId,externalTokenHash);
         
-        initializeExternalToken(
-                msg.sender,
-                from,
-                tokenId,
-                externalTokenHash
-            );
-
-
         return this.onERC721Received.selector;
     }
 

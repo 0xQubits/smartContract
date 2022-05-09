@@ -134,9 +134,7 @@ describe("Split", function () {
         let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
         let activeTokens = await bitToken.getActiveTokenArr(externalTokenHash)
         testTotal(activeTokens)
-        let externalToken = await bitToken.getExternalToken(externalTokenHash);
-        console.log(externalToken)
-
+        
     });
 
 
