@@ -4,4 +4,10 @@ require("@nomiclabs/hardhat-waffle");
  */
 module.exports = {
   solidity: "0.8.11",
+  defaultNetwork: "hardhat",
+  networks: {
+    hardhat: {
+      allowUnlimitedContractSize:true
+    }
+  },
 };

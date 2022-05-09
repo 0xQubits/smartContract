@@ -46,8 +46,9 @@ describe("Initialization", function () {
 
         expect(await game.ownerOf(gameTokenId)).to.equal(bitToken.address);
 
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
     
-        let externalToken = await bitToken.getExternalToken(game.address,gameTokenId);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash);
         expect(externalToken.contract_ ).to.equal(game.address);
         expect(externalToken.sender ).to.equal(owner.address);
 
@@ -57,8 +58,7 @@ describe("Initialization", function () {
         expect(token.portion).to.equal(10**12); 
         expect(token.hasBeenAltered).to.equal(false);
 
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
-        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
+        let activeTokens = await bitToken.getActiveTokenArr(externalTokenHash)
         
         testTotal(activeTokens)
         
@@ -84,7 +84,7 @@ describe("Split", function () {
             4 * 10 ** 11,
         ]
         
-        let divisionTx = await bitToken.modifyTokenOwnership(0,new_owners,new_owners_portion);
+        let divisionTx = await bitToken.splitTokenOwnership(0,new_owners,new_owners_portion);
         await divisionTx.wait()
         // console.log(res.events)
 
@@ -100,8 +100,8 @@ describe("Split", function () {
             expect(new_divided_token.hasBeenAltered).to.equal(false);
 
         }
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
-        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
+        let activeTokens = await bitToken.getActiveTokenArr(externalTokenHash)
         testTotal(activeTokens)
         
 
@@ -118,7 +118,7 @@ describe("Split", function () {
         let new_owners = [owner.address,addr1.address]
         let new_owners_portion = [5 * 10 ** 10,5 * 10 ** 10]
         owners_token_id = 1
-        let divisionTx = await bitToken.modifyTokenOwnership(owners_token_id,new_owners,new_owners_portion);
+        let divisionTx = await bitToken.splitTokenOwnership(owners_token_id,new_owners,new_owners_portion);
         await divisionTx.wait()
 
         let divided_token = await bitToken.getToken(owners_token_id); 
@@ -131,10 +131,10 @@ describe("Split", function () {
             expect(new_divided_token.hasBeenAltered).to.equal(false);
 
         }
-        let hash_value = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
-        let activeTokens = await bitToken.getActiveTokenArr(hash_value)
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId)
+        let activeTokens = await bitToken.getActiveTokenArr(externalTokenHash)
         testTotal(activeTokens)
-        let externalToken = await bitToken.getExternalToken(game.address,gameTokenId);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash);
         console.log(externalToken)
 
     });

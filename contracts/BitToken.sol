@@ -6,22 +6,30 @@ import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "hardhat/console.sol";
 
-contract BitToken is ERC721,IERC721Receiver, AccessControl {
+contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     
     // struct and variables
     struct ExternalToken {
+        // Stores information on the
+        // received External Token
         address sender;
         address contract_;
         uint tokenId;
         uint[] historyArr;
-        uint[] activeTokenIdsArr;
+        // Array of the ids of the BitTokens
+        // that have not been altered.
+        // It effectively stores the
+        // BitTokens of all current owners 
+        uint[] activeTokenIdsArr; 
 
     }
 
     struct Token {
+        // Stores BitToken information
         address owner;
         uint portion;
         bool hasBeenAltered;
@@ -31,21 +39,26 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIdCounter;
     uint public constant DECIMAL = uint(12);
-    uint public constant TOTAL = uint(10)**DECIMAL;
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    // The value that denotes 100% ownership of an externalToken
+    uint public constant TOTAL = uint(10)**DECIMAL; // 10 ^ 12
     mapping(bytes32 => ExternalToken) public ExternalTokenMap;
     Token[] public TokenArr;
 
+    // ROLES
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
 
     // Events
-    event ReceivedExternalToken(address sender ,address operator, address from,uint tokenId,bytes32 externalTokenHash );
+    event InitializedExternalToken(address contract_ ,address sender, uint tokenId);
     event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
 
 
     
-    constructor() ERC721("MyToken", "MTK") {
+    constructor() ERC721("BitToken", "BIT") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
     }
 
 
@@ -56,12 +69,18 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             uint portion,
             bytes32 externalTokenHash
         ) private returns (uint){
+        // This is a private function for token mint
+        ExternalToken storage externalToken;
+        externalToken = ExternalTokenMap[externalTokenHash];
+        // make sure external token object exists
+        // added this after discovery of a previous bug
+        assert(externalToken.contract_ != address(0));
 
-        // actual mint
-        uint tokenId = _tokenIdCounter.current();
-        // using safeMint can lead to having unexpected behaviour
-        // if mintToken func is called from a loop and
+        //////////// Actual Mint ///////////
+        // using safeMint can lead to unexpected behaviour
+        // if this function is called from a loop and
         // one of the receivers cannot receive the token
+        uint tokenId = _tokenIdCounter.current();
         _mint(to, tokenId); 
         _tokenIdCounter.increment();
 
@@ -75,38 +94,35 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         TokenArr.push(token);
         
         // add transaction to history
-        ExternalToken storage externalToken;
-        externalToken = ExternalTokenMap[externalTokenHash];
         externalToken.historyArr.push(tokenId);
-
-        assert(externalToken.contract_ != address(0));
-        
-
 
         emit OwnershipModified(from,to,externalToken.tokenId,portion);
         return tokenId;
     }
 
-    
-    function makeExternalTokenHash(
-        address _contract_address,
-        uint _tokenId
-    ) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_contract_address, _tokenId));
-    }
 
 
 
-    function modifyTokenOwnership(
+
+
+    function splitTokenOwnership(
         uint _tokenId,
         address[] memory _new_owners, 
         uint[] memory _new_owners_portion
 
         )  public {
-            require(_new_owners.length == _new_owners_portion.length);
+            // This is a public function that spilts ownership 
+            // of a BitToken. In order for this to work, the 
+            // owner has to reassign 100% of whatever portion 
+            // the owner has.
+            // E.g if A's token portion is 200 (out of TOTAL),
+            // the sum of _new_owners_portion must be 200.
+            // This means that if A plan's to retain a portion of it
+            // He must also assign a portion to himself 
+            require(_new_owners.length == _new_owners_portion.length,"The 'portion' and 'address' fields must be of equal length");
 
             Token storage token = TokenArr[_tokenId];
-            require(token.owner != address(0));
+            assert(token.owner != address(0));
             require(token.owner == msg.sender,"Only the owner may transfer this NFT");
             require(token.hasBeenAltered == false,"Token may not  be altered more than once");
         
@@ -119,9 +135,11 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             }
             require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
 
+            // VERY IMPORTANT to state that
+            // token has been modified
             token.hasBeenAltered = true;
             
-            uint[] memory new_divided_token_ids = new uint[](_new_owners.length);
+            uint[] memory newDividedTokenIds = new uint[](_new_owners.length);
 
 
             for (uint i=0;i < _new_owners.length;i++){
@@ -132,25 +150,32 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
                      _new_owners_portion[i],
                      token.externalTokenHash
                 );
-                new_divided_token_ids[i] = new_token_id;
+                newDividedTokenIds[i] = new_token_id;
             }
             updateActiveTokenArr(
                 token.externalTokenHash,
                 _tokenId,
-                new_divided_token_ids
+                newDividedTokenIds
             );
 
             
         
     }
 
+    function makeExternalTokenHash(
+        address _contract_address,
+        uint _tokenId
+    ) public pure returns (bytes32) {
+        // constructs hash from external contract address and token id
+        return keccak256(abi.encodePacked(_contract_address, _tokenId));
+    }
+
 
 
     function getExternalToken(
-        address _contract,
-        uint _tokenId
+        bytes32 externalTokenHash
     ) public view returns (ExternalToken memory){
-        bytes32 externalTokenHash = makeExternalTokenHash(_contract, _tokenId);
+        // Get ExternalToken object using hash
         return ExternalTokenMap[externalTokenHash];
     }
 
@@ -160,6 +185,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
     function getToken(
         uint _tokenId
     ) public view returns (Token memory){
+        // Get BitToken using token id 
         return TokenArr[_tokenId];
     }
 
@@ -169,25 +195,33 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
     function getTokenArr(
         uint[] memory _tokenIds
     ) public view returns (Token[] memory){
-        
+        // Gets an array of BitToken(Token) objects
+        // when given an array of token ids 
         Token[] memory tokens = new Token[](_tokenIds.length);
         for (uint i=0;i<_tokenIds.length;i++){
             tokens[i] = TokenArr[_tokenIds[i]];
         }
         return tokens;
     }
-    
 
-     function getActiveTokenIds(
+
+
+
+    function getActiveTokenIds(
         bytes32 externalTokenHash
     ) public view returns (uint[] memory) {
+        // Get the ids of all active tokens
+        // connected to an ExternalToken
         ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash]; 
         return externalToken.activeTokenIdsArr;
     }
 
+
     function getActiveTokenArr(
         bytes32 externalTokenHash
     ) public view returns (Token[] memory) {
+        // Get the BitToken(Token) objects of all
+        // active tokens connected to an ExternalToken
         ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash];
         uint[] memory activeTokenIdsArr = externalToken.activeTokenIdsArr;
 
@@ -206,6 +240,8 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         uint outgoingTokenId,
         uint[] memory incomingTokenIds
     ) private {
+        // This is a private function that updates the 
+        // active token array of an ExternalToken object
         require(incomingTokenIds.length > 0,"Incoming Token Ids array must have at least one value");
         
         ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
@@ -221,6 +257,7 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
                         activeTokenIdsArr.push(incomingTokenIds[j]);
                     }
                 }
+                break;
             }
         }
     }
@@ -233,9 +270,13 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         bytes32 externalTokenHash
 
     ) public returns (bool) {
-        
+        // This is a public function to take the token out of 
+        // this contract and back to the ExternalToken contract
 
-        uint expected_total = 0;
+        // The person calling this contract must own all
+        // the active tokens connected to the ExternalToken 
+
+        uint expectedTotal = 0;
         ExternalToken storage externalToken;
         externalToken =  ExternalTokenMap[externalTokenHash];
         uint[] storage activeTokenIdsArr = externalToken.activeTokenIdsArr;
@@ -246,15 +287,15 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
             require(token.owner != address(0));
             require(token.owner == msg.sender,"Only the owner may transfer this NFT");
             require(token.hasBeenAltered == false,"One token has already been altered ");
-            expected_total += token.portion;
+            expectedTotal += token.portion;
         }
 
-        assert(expected_total==TOTAL);
+        assert(expectedTotal==TOTAL);
 
         ERC721 externalTokenContract = ERC721(externalToken.contract_);
         externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
 
-        // make sure tokens can't be reused
+        // MAKE SURE TO ADD THAT THE TOKENS HAVE BEEN ALTERED
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             Token storage token = TokenArr[activeTokenIdsArr[i]];
             token.hasBeenAltered = true;            
@@ -262,6 +303,60 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         return true;
     }
 
+    function initializeExternalToken(
+        address contract_, 
+        address sender,
+        uint tokenId,
+        bytes32 externalTokenHash 
+    ) private {
+        // This is a private function to mint a BitToken 
+        // representing 100% ownership of an external 
+        // token on receipt of the external token
+        ExternalToken memory externalToken;
+
+        externalToken.contract_ = contract_;
+        externalToken.sender = sender;
+        externalToken.tokenId = tokenId;
+
+        // set this so that the mintToken function can access it
+        ExternalTokenMap[externalTokenHash] = externalToken;
+
+        uint[] memory newDividedTokenIds = new uint[](1);
+        uint newDividedTokenId;
+        newDividedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash);
+        
+        newDividedTokenIds[0] = newDividedTokenId;
+        ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
+        externalTokenRefreshed.activeTokenIdsArr = newDividedTokenIds;
+
+        emit InitializedExternalToken(contract_,sender,tokenId);
+
+    }
+
+
+
+    // function manualInitialization(
+    //     address contract_,
+    //     uint tokenId
+    // ) public {
+    //     ERC721 externalTokenContract = ERC721(contract_);
+        ////////////////////////////////////////////////////////////
+        //// I don't have a way to determine who sent the token ////
+        //// so this feature is paused                          ////
+        ////////////////////////////////////////////////////////////
+
+    //     //First check. This contract must own the token in question
+    //     assert(externalTokenContract.ownerOf(tokenId)==address(this));
+    //     bytes32 externalTokenHash = makeExternalTokenHash(contract_, tokenId);
+    //     ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
+    //     //Second Check. Make sure the token 
+    //     //has been been previously initialized
+    //     assert(externalToken.contract_ == address(0));
+    //     initializeExternalToken(contract_,msg.sender,tokenId,externalTokenHash);
+
+        
+        
+    // }
 
 
     function onERC721Received(
@@ -271,36 +366,27 @@ contract BitToken is ERC721,IERC721Receiver, AccessControl {
         bytes memory
     ) public virtual override returns (bytes4) {
 
-        ExternalToken memory externalToken;
-        externalToken.contract_ = msg.sender;
-        externalToken.sender = from;
-        externalToken.tokenId = tokenId;
         bytes32 externalTokenHash = makeExternalTokenHash(msg.sender, tokenId);
-        // set this so that the mintToken can access it
-        ExternalTokenMap[externalTokenHash] = externalToken;
-
-        uint[] memory new_divided_token_ids = new uint[](1);
-        uint new_divided_token_id;
-        new_divided_token_id = mintToken(
-            externalToken.sender,
-            externalToken.sender,
-            TOTAL,
-            externalTokenHash
-        );
-
         
-        new_divided_token_ids[0] = new_divided_token_id;
-        ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
-        externalTokenRefreshed.activeTokenIdsArr = new_divided_token_ids;
-        
+        initializeExternalToken(
+                msg.sender,
+                from,
+                tokenId,
+                externalTokenHash
+            );
 
-
-
-        emit ReceivedExternalToken(msg.sender,operator,from, tokenId,externalTokenHash);
 
         return this.onERC721Received.selector;
     }
 
+
+    function pause() public onlyRole(PAUSER_ROLE) {
+        _pause();
+    }
+
+    function unpause() public onlyRole(PAUSER_ROLE) {
+        _unpause();
+    }
 
 
     function supportsInterface(bytes4 interfaceId)
