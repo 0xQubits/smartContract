@@ -113,7 +113,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         address[] memory _new_owners, 
         uint[] memory _new_owners_portion
 
-        )  public {
+        )  public whenNotPaused {
             // This is a public function that spilts ownership 
             // of a BitToken. In order for this to work, the 
             // owner has to reassign 100% of whatever portion 
@@ -122,17 +122,16 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             // the sum of _new_owners_portion must be 200.
             // This means that if A plan's to retain a portion of it
             // He must also assign a portion to himself 
-            require(_new_owners.length == _new_owners_portion.length,"The 'portion' and 'address' fields must be of equal length");
 
             Token storage token = TokenArr[_tokenId];
             assert(token.owner != address(0));
-            require(token.owner == msg.sender,"Only the owner may transfer this NFT");
+            require(token.owner == msg.sender,"Only the owner may split this token");
             require(token.hasBeenAltered == false,"Token may not  be altered more than once");
-        
+            require(_new_owners.length == _new_owners_portion.length,"The portion and address fields must be of equal length");
 
             uint total = 0;
             for (uint i=0;i < _new_owners.length;i++){
-                require(_new_owners[i] != address(0),"There is an invalid recepient address");
+                require(_new_owners[i] != address(0),"Invalid recepient address included");
                 require(_new_owners_portion[i] <= token.portion,"You can't transfer more than 100% of your holding");
                 total += _new_owners_portion[i];
             }
@@ -246,7 +245,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     ) private {
         // This is a private function that updates the 
         // active token array of an ExternalToken object
-        require(incomingTokenIds.length > 0,"Incoming Token Ids array must have at least one value");
+        assert(incomingTokenIds.length > 0);
         
         ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
         uint[] storage activeTokenIdsArr = externalToken.activeTokenIdsArr;
@@ -273,7 +272,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     function returnToken(
         bytes32 externalTokenHash
 
-    ) public returns (bool) {
+    ) public whenNotPaused returns (bool) {
         // This is a public function to take the token out of 
         // this contract and back to the ExternalToken contract
 
@@ -319,7 +318,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         address sender,
         uint tokenId,
         bytes32 externalTokenHash 
-    ) private {
+    ) private whenNotPaused {
         // This is a private function to mint a BitToken 
         // representing 100% ownership of an external 
         // token on receipt of the external token
@@ -365,9 +364,22 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         _pause();
     }
 
+    
+    
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
+
+
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount)
+        internal
+        whenNotPaused
+        override
+    {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+
 
 
     function supportsInterface(bytes4 interfaceId)
