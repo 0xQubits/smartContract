@@ -142,7 +142,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             // token has been modified
             token.hasBeenAltered = true;
             
-            uint[] memory newDividedTokenIds = new uint[](_new_owners.length);
+            uint[] memory newlyCreatedTokenIds = new uint[](_new_owners.length);
 
 
             for (uint i=0;i < _new_owners.length;i++){
@@ -154,12 +154,12 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
                      token.externalTokenHash,
                      _tokenId
                 );
-                newDividedTokenIds[i] = new_token_id;
+                newlyCreatedTokenIds[i] = new_token_id;
             }
             updateActiveTokenArr(
                 token.externalTokenHash,
                 _tokenId,
-                newDividedTokenIds
+                newlyCreatedTokenIds
             );
 
             
@@ -332,15 +332,13 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         // set this so that the mintToken function can access it
         ExternalTokenMap[externalTokenHash] = externalToken;
 
-        uint[] memory newDividedTokenIds = new uint[](1);
-        uint newDividedTokenId;
-        // uint parentId = 2 ^ 256 - 1;
+        uint[] memory newlyCreatedTokenIds = new uint[](1);
         uint MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-        newDividedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash,MAX_INT);
+        uint newlyCreatedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash,MAX_INT);
         
-        newDividedTokenIds[0] = newDividedTokenId;
+        newlyCreatedTokenIds[0] = newlyCreatedTokenId;
         ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
-        externalTokenRefreshed.activeTokenIdsArr = newDividedTokenIds;
+        externalTokenRefreshed.activeTokenIdsArr = newlyCreatedTokenIds;
 
         emit InitializedExternalToken(contract_,sender,tokenId);
 
