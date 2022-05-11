@@ -1,9 +1,8 @@
 const { expect, assert } = require("chai");
 const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
-const {bigNumberToNumber,checkSumTotal} = require("./utils");
+const {bigNumberToNumber,checkSumTotal, addressToString} = require("./utils");
 
-let sender;
 let bitToken;
 let game;
 let addr0;
@@ -12,6 +11,8 @@ let addr2;
 let addr3;
 let addrs;
 let firstGameTokenId;
+let secondGameTokenId;
+let thirdGameTokenId;
 let new_owners;
 let new_owners_portion;
 let startTokenIndex;
@@ -35,10 +36,14 @@ before(async function () {
     await mintGameTx.wait();
     const mintGameTx2 = await game.awardItem(sender.address);
     await mintGameTx2.wait();
+    const mintGameTx3 = await game.awardItem(sender.address);
+    await mintGameTx3.wait();
     firstGameTokenId = 0;
     secondGameTokenId = 1;
+    thirdGameTokenId = 2;
     expect(await game.ownerOf(firstGameTokenId)).to.equal(sender.address);
     expect(await game.ownerOf(secondGameTokenId)).to.equal(sender.address);
+    expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
   });
 
 
@@ -50,7 +55,6 @@ describe("Initialization", function () {
 
     it("Should that an external token can be sent to this contract", async function () {
         let sender = addr0;
-        x = "ffa"
         let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,firstGameTokenId);
         await safeTransferTx.wait();
         expect(await game.ownerOf(firstGameTokenId)).to.equal(bitToken.address);
@@ -77,8 +81,9 @@ describe("Initialization", function () {
         let sender = addr0;
         let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
         let externalToken = await bitToken.getExternalToken(externalTokenHash)
+        
         expect(externalToken.contract_ ).to.equal(game.address);
-        expect(externalToken.sender ).to.equal(sender.address);
+        expect(externalToken.senderArr).to.have.members([sender.address.toString()]);
         expect(externalToken.tokenId.toNumber() ).to.equal(gameTokenId);
         
     })  
@@ -192,6 +197,72 @@ describe("Further split with different account", function () {
 
 
 
+describe("Return Token", function () {
+    
+    
+    it("Should send and return the token", async function () {
+        let sender = addr0;
+        let externalTokenHash = bitToken.makeExternalTokenHash(game.address,thirdGameTokenId)
+
+        
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        await safeTransferTx.wait();
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(bitToken.address);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash);
+        let activeTokenIdsArr = [9];
+        let historyArr = [9]; 
+        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
+        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+
+
+        let returnTx = await bitToken.connect(sender).returnToken(externalTokenHash);
+        await expect(returnTx).to.emit(bitToken, 'ExternalTokenReturn')
+        .withArgs(game.address, sender.address, thirdGameTokenId);
+        
+        activeTokenIdsArr = [];
+        externalToken = await bitToken.getExternalToken(externalTokenHash);
+        expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
+        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
+    }),
+
+
+    it("Should send and return the token the second time", async function () {
+        let sender = addr0;
+        let externalTokenHash = bitToken.makeExternalTokenHash(game.address,thirdGameTokenId)
+
+        
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        await safeTransferTx.wait();
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(bitToken.address);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash);
+        let activeTokenIdsArr = [10];
+        let historyArr = [9,10]; 
+        let senderArr = [
+            sender.address.toString(),
+            sender.address.toString()
+        ];
+        expect(externalToken.senderArr).to.have.members(senderArr);
+        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
+        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+
+
+        let returnTx = await bitToken.connect(sender).returnToken(externalTokenHash);
+        await expect(returnTx).to.emit(bitToken, 'ExternalTokenReturn')
+        .withArgs(game.address, sender.address, thirdGameTokenId);
+        
+        activeTokenIdsArr = [];
+        externalToken = await bitToken.getExternalToken(externalTokenHash);
+        expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
+        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
+    
+    })
+});
+
+
+
+
 describe("Illegal transactions", function () {
     
 
@@ -270,6 +341,19 @@ describe("Illegal transactions", function () {
         await bitToken.connect(sender).unpause();
         let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,secondGameTokenId);
         await initTx.wait()
+        
+    }),
+
+
+    it("Should ensure that only the owner can return token",async function(){
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,thirdGameTokenId);
+        let sender = addr0;
+        let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        await initTx.wait();
+
+        
+        await expect(bitToken.connect(addr1).returnToken(externalTokenHash))
+        .to.be.revertedWith("Only the owner may return this token");
         
     })
     

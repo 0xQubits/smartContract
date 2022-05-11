@@ -16,7 +16,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     struct ExternalToken {
         // Stores information on the
         // received External Token
-        address sender;
+        address[] senderArr;
         address contract_;
         uint tokenId;
         uint[] historyArr;
@@ -49,6 +49,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     // Events
     event InitializedExternalToken(address contract_ ,address sender, uint tokenId);
     event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
+    event ExternalTokenReturn(address contract_ ,address owner, uint externalTokenId);
     
 
 
@@ -265,7 +266,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     function returnToken(
         bytes32 externalTokenHash
 
-    ) public whenNotPaused returns (bool) {
+    ) public whenNotPaused {
         // This is a public function to take the token out of 
         // this contract and back to the ExternalToken contract
 
@@ -281,8 +282,8 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             uint tokenId = activeTokenIdsArr[i];
             Token storage token = TokenArr[tokenId];
             require(token.owner != address(0));
-            require(token.owner == msg.sender,"Only the owner may transfer this NFT");
-            require(token.hasBeenAltered == false,"One token has already been altered ");
+            require(token.owner == msg.sender,"Only the owner may return this token");
+            assert(token.hasBeenAltered == false);
             expectedTotal += token.portion;
         }
 
@@ -296,12 +297,12 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             Token storage token = TokenArr[activeTokenIdsArr[i]];
             token.hasBeenAltered = true;            
         }
-
-        ERC721 externalTokenContract = ERC721(externalToken.contract_);
+        uint externalTokenId = externalToken.tokenId;
+        address contract_ = externalToken.contract_;
+        ERC721 externalTokenContract = ERC721(contract_);
         externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
 
-        
-        return true;
+        emit ExternalTokenReturn(contract_, msg.sender, externalTokenId);
     }
 
 
@@ -321,12 +322,19 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         // representing 100% ownership of an external 
         // token on receipt of the external token
         // ExternalToken memory externalToken;
-        ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash];
-        // console.log(externalToken.contract_,"Start");
+        ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
+        if (externalToken.senderArr.length != 0){
+            externalToken.senderArr.push(sender);
 
-        externalToken.contract_ = contract_;
-        externalToken.sender = sender;
-        externalToken.tokenId = tokenId;
+        } else {
+            address[] memory senderArr = new address[](1);
+            senderArr[0] = sender;
+
+            externalToken.contract_ = contract_;
+            externalToken.senderArr = senderArr;
+            externalToken.tokenId = tokenId;
+        } 
+        
 
         // set this so that the mintToken function can access it
         ExternalTokenMap[externalTokenHash] = externalToken;
@@ -338,7 +346,6 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         newlyCreatedTokenIds[0] = newlyCreatedTokenId;
         ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
         externalTokenRefreshed.activeTokenIdsArr = newlyCreatedTokenIds;
-        // console.log(externalToken.contract_,"End");
 
         emit InitializedExternalToken(contract_,sender,tokenId);
 

@@ -4,6 +4,10 @@ function bigNumberToNumber(bigNumber){
     return bigNumber.toNumber();
 }
 
+function addressToString(address){
+    return address.address;
+}
+
 async function checkSumTotal(externalTokenHash){
     let activeTokens = await bitToken.getActiveTokenArr(externalTokenHash);
     let total = 0;
@@ -16,5 +20,6 @@ async function checkSumTotal(externalTokenHash){
 
 module.exports = {
     bigNumberToNumber:bigNumberToNumber,
+    addressToString:addressToString,
     checkSumTotal:checkSumTotal
 }
