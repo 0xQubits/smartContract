@@ -3,9 +3,9 @@ const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
 const {bigNumberToNumber,checkSumTotal} = require("./utils");
 
+let sender;
 let bitToken;
 let game;
-let owner;
 let addr0;
 let addr1;
 let addr2;
@@ -22,7 +22,8 @@ const MINTER_ROLE = "0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f33766734
 before(async function () {
     
     [addr0, addr1, addr2,addr3, ...addrs] = await ethers.getSigners();
-    owner = addr0;
+    let sender = addr0;
+
     const BitToken = await ethers.getContractFactory("BitToken");
     bitToken = await BitToken.deploy();
     const Game = await ethers.getContractFactory("Game");
@@ -30,14 +31,14 @@ before(async function () {
     await bitToken.deployed();
     await game.deployed();
 
-    const mintGameTx = await game.awardItem(owner.address);
+    const mintGameTx = await game.awardItem(sender.address);
     await mintGameTx.wait();
-    const mintGameTx2 = await game.awardItem(owner.address);
+    const mintGameTx2 = await game.awardItem(sender.address);
     await mintGameTx2.wait();
     firstGameTokenId = 0;
     secondGameTokenId = 1;
-    expect(await game.ownerOf(firstGameTokenId)).to.equal(owner.address);
-    expect(await game.ownerOf(secondGameTokenId)).to.equal(owner.address);
+    expect(await game.ownerOf(firstGameTokenId)).to.equal(sender.address);
+    expect(await game.ownerOf(secondGameTokenId)).to.equal(sender.address);
   });
 
 
@@ -45,46 +46,51 @@ before(async function () {
 
 
 describe("Initialization", function () {
+    
 
     it("Should that an external token can be sent to this contract", async function () {
-        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](owner.address,bitToken.address,firstGameTokenId);
+        let sender = addr0;
+        x = "ffa"
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,firstGameTokenId);
         await safeTransferTx.wait();
         expect(await game.ownerOf(firstGameTokenId)).to.equal(bitToken.address);
         
     }),  
-
-    it("Should ensure that an ExternalToken object is created \
-        and that it has all the correct properties", async function () {
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId)
-        let externalToken = await bitToken.getExternalToken(externalTokenHash);
-        let historyArr = [0];
-        let activeTokenIdsArr = [0];
-        expect(externalToken.contract_ ).to.equal(game.address);
-        expect(externalToken.sender ).to.equal(owner.address);
-        expect(externalToken.tokenId.toNumber() ).to.equal(0);
-        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
-        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
-
-    }),
-
-    it("Should ensure that the active token array sums up to 100%  ", async function () {
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
-        checkSumTotal(externalTokenHash);
-    }),
-
+   
+    
     it("Should ensure that a bitToken object is created \
         which will represent 100% ownership of the ExternalToken", async function () {
         const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
-        
+        let sender = addr0;
         let token = await bitToken.getToken(0);
         let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
-        expect(token.owner).to.equal(owner.address);
+        expect(token.owner).to.equal(sender.address);
         expect(token.portion).to.equal(MAX_PORTION); 
         expect(token.hasBeenAltered).to.equal(false);
         expect(token.externalTokenHash).to.equal(externalTokenHash);
         expect(token.parentId).to.equal(MAX_INT_BIGNUMBER);
+
         
-    })   
+    }),
+
+    it("Should ensure that basic ExternalToken data is accurate", async function () {
+        let sender = addr0;
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash)
+        expect(externalToken.contract_ ).to.equal(game.address);
+        expect(externalToken.sender ).to.equal(sender.address);
+        expect(externalToken.tokenId.toNumber() ).to.equal(gameTokenId);
+        
+    })  
+
+
+    checkExternalTokenProperties(
+        gameTokenId=0,
+        historyArr=[0],
+        activeTokenIdsArr=[0]
+    );
+
+    
     
 });
 
@@ -95,22 +101,28 @@ describe("Split", function () {
     
     
     it("Should send percentage of a token to new owners", async function () {
-        new_owners = [owner.address,addr1.address,
+        let sender = addr0;
+        new_owners = [sender.address,addr1.address,
             addr2.address,addr3.address];
         new_owners_portion = [1 * 10 ** 11, 3 * 10 ** 11,
                               2 * 10 ** 11, 4 * 10 ** 11];
         let divisionTx = await bitToken.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
-            
-        for (let i in new_owners){  
-            let newOwner = new_owners[i];
-            let newOwnerPortion = new_owners_portion[i].toString();
+       
+        for (let index in new_owners){  
+            let newOwner = new_owners[index];
+            let newOwnerPortion = new_owners_portion[index].toString();
             await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
-            .withArgs(owner.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
         };
        
     })
-    postSplitTests(splitTokenId);
+    checkBitTokenProperties(splitTokenId);
+    checkExternalTokenProperties(
+        gameTokenId=0,
+        historyArr=[0,1,2,3,4],
+        activeTokenIdsArr=[1,2,3,4]
+    );
 
 
 });
@@ -124,20 +136,26 @@ describe("Further split", function () {
 
     
     it("Should send percentage of a token to new owners", async function () {
-        new_owners = [owner.address,addr1.address]
+        let sender = addr0;
+        new_owners = [sender.address,addr1.address]
         new_owners_portion = [5 * 10 ** 10,5 * 10 ** 10]
         let divisionTx = await bitToken.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
-        for (let i in new_owners){  
-            let newOwner = new_owners[i];
-            let newOwnerPortion = new_owners_portion[i].toString();
+        for (let index in new_owners){  
+            let newOwner = new_owners[index];
+            let newOwnerPortion = new_owners_portion[index].toString();
             await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
-            .withArgs(owner.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
         };
     
     })
     
-    postSplitTests(splitTokenId);
+    checkBitTokenProperties(splitTokenId);
+    checkExternalTokenProperties(
+        gameTokenId=0,
+        historyArr=[0,1,2,3,4,5,6],
+        activeTokenIdsArr=[2,3,4,5,6]
+    );
 
     
 });
@@ -147,21 +165,26 @@ describe("Further split with different account", function () {
     let splitTokenId = 2;
     
     it("Should send percentage of a token to new owners", async function () {
-        owner = addr1
-        new_owners = [owner.address,addr2.address]
+        let sender = addr1;
+        new_owners = [sender.address,addr2.address]
         new_owners_portion = [2 * 10 ** 11,1 * 10 ** 11]
-        let divisionTx = await bitToken.connect(owner).splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
+        let divisionTx = await bitToken.connect(sender).splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
-        for (let i in new_owners){  
-            let newOwner = new_owners[i];
-            let newOwnerPortion = new_owners_portion[i].toString();
+        for (let index in new_owners){  
+            let newOwner = new_owners[index];
+            let newOwnerPortion = new_owners_portion[index].toString();
             await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
-            .withArgs(owner.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
         };
         
 
     })
-    postSplitTests(splitTokenId);
+    checkBitTokenProperties(splitTokenId);
+    checkExternalTokenProperties(
+        gameTokenId=0,
+        historyArr=[0,1,2,3,4,5,6,7,8],
+        activeTokenIdsArr=[3,4,5,6,7,8]
+    );
 
     
     
@@ -257,7 +280,7 @@ describe("Illegal transactions", function () {
 
 
 
-function postSplitTests(splitTokenId) {
+function checkBitTokenProperties(splitTokenId) {
 
     it("Should ensure that the altered token\
         is no longer modifiable", async function () {
@@ -284,13 +307,29 @@ function postSplitTests(splitTokenId) {
             expect(newToken.parentId.toNumber()).to.equal(splitTokenId);
          
         };
-    }),
-
-
-        
-    it("Should ensure that the active token array sums up to 100%  ", async function () {
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
-        checkSumTotal(externalTokenHash);
     })
 
+}
+
+
+function checkExternalTokenProperties(
+        gameTokenId,
+        historyArr,
+        activeTokenIdsArr
+        ){
+    
+    it("Should ensure that an ExternalToken\
+        object has all the correct properties", async function () {
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId);
+        let externalToken = await bitToken.getExternalToken(externalTokenHash);
+
+        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
+
+    }),
+
+    it("Should ensure that the active token array sums up to 100%  ", async function () {
+        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId);
+        checkSumTotal(externalTokenHash);
+    })
 }

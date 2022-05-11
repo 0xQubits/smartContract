@@ -20,10 +20,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         address contract_;
         uint tokenId;
         uint[] historyArr;
-        // Array of the ids of the BitTokens
-        // that have not been altered.
-        // It effectively stores the
-        // BitTokens of all current owners 
+        // BitToken Ids of all current owners 
         uint[] activeTokenIdsArr; 
 
     }
@@ -252,13 +249,9 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         for (uint i=0; i < activeTokenIdsArr.length;i++){
             uint tokenId = activeTokenIdsArr[i];
             if (tokenId == outgoingTokenId){
-                delete activeTokenIdsArr[i];
-                for (uint j=0;j<incomingTokenIds.length;j++){
-                    if (j==0){
-                        activeTokenIdsArr[i] = incomingTokenIds[j];
-                    } else {
-                        activeTokenIdsArr.push(incomingTokenIds[j]);
-                    }
+                activeTokenIdsArr[i] = incomingTokenIds[0];
+                for (uint j=1;j<incomingTokenIds.length;j++){
+                    activeTokenIdsArr.push(incomingTokenIds[j]);
                 }
                 break;
             }
@@ -293,16 +286,21 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             expectedTotal += token.portion;
         }
 
+        for (uint i=0; i < activeTokenIdsArr.length;i++){
+           activeTokenIdsArr.pop();
+        }
+
         assert(expectedTotal==TOTAL);
 
-        ERC721 externalTokenContract = ERC721(externalToken.contract_);
-        externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
-
-        // MAKE SURE TO ADD THAT THE TOKENS HAVE BEEN ALTERED
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             Token storage token = TokenArr[activeTokenIdsArr[i]];
             token.hasBeenAltered = true;            
         }
+
+        ERC721 externalTokenContract = ERC721(externalToken.contract_);
+        externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
+
+        
         return true;
     }
 
@@ -322,7 +320,9 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         // This is a private function to mint a BitToken 
         // representing 100% ownership of an external 
         // token on receipt of the external token
-        ExternalToken memory externalToken;
+        // ExternalToken memory externalToken;
+        ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash];
+        // console.log(externalToken.contract_,"Start");
 
         externalToken.contract_ = contract_;
         externalToken.sender = sender;
@@ -338,6 +338,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         newlyCreatedTokenIds[0] = newlyCreatedTokenId;
         ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
         externalTokenRefreshed.activeTokenIdsArr = newlyCreatedTokenIds;
+        // console.log(externalToken.contract_,"End");
 
         emit InitializedExternalToken(contract_,sender,tokenId);
 
