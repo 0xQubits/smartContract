@@ -243,6 +243,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         externalToken =  ExternalTokenMap[externalTokenHash];
         uint[] storage activeTokenIdsArr = externalToken.activeTokenIdsArr;
         
+        assert(activeTokenIdsArr.length > 0);
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             uint tokenId = activeTokenIdsArr[i];
             Token storage token = TokenArr[tokenId];
@@ -254,16 +255,23 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         assert(expectedTotal==TOTAL);
 
 
+
+        assert(activeTokenIdsArr.length > 0);
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             uint tokenId = activeTokenIdsArr[i];
             Token storage token = TokenArr[tokenId];
             token.hasBeenAltered = true; 
-            _burn(tokenId);           
+            _burn(tokenId);
+                    
         }
 
         for (uint i=0; i < activeTokenIdsArr.length;i++){
            activeTokenIdsArr.pop();
         }
+       
+
+        assert(activeTokenIdsArr.length == 0);
+        
 
 
         uint externalTokenId = externalToken.tokenId;
