@@ -2,15 +2,14 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "hardhat/console.sol";
 
-contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
+
+contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
     
     // struct and variables
     struct ExternalToken {
@@ -20,13 +19,13 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         address contract_;
         uint tokenId;
         uint[] historyArr;
-        // BitToken Ids of all current owners 
+        // Quantum token Ids of all current owners 
         uint[] activeTokenIdsArr; 
 
     }
 
     struct Token {
-        // Stores BitToken information
+        // Stores Quantum token information
         address owner;
         uint portion;
         bool hasBeenAltered;
@@ -51,9 +50,12 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
     event ExternalTokenReturn(address contract_ ,address owner, uint externalTokenId);
     
+    //Errors
+    error UnImplemented();
 
 
-    constructor() ERC721("BitToken", "BIT") {
+
+    constructor() ERC721("Quantum", "QTM") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -113,7 +115,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
 
         )  public whenNotPaused {
             // This is a public function that spilts ownership 
-            // of a BitToken. In order for this to work, the 
+            // of a Quantum token. In order for this to work, the 
             // owner has to reassign 100% of whatever portion 
             // the owner has.
             // E.g if A's token portion is 200 (out of TOTAL),
@@ -136,8 +138,10 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
 
             // VERY IMPORTANT to state that
-            // token has been modified
+            // token has been modified and 
+            // BURN the old token
             token.hasBeenAltered = true;
+            _burn(_tokenId);
             
             uint[] memory newlyCreatedTokenIds = new uint[](_new_owners.length);
 
@@ -172,8 +176,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     }
 
 
-
-    function getExternalToken(
+   function getExternalToken(
         bytes32 externalTokenHash
     ) public view returns (ExternalToken memory){
         // Get ExternalToken object using hash
@@ -183,20 +186,10 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
 
 
 
-    function getToken(
-        uint _tokenId
-    ) public view returns (Token memory){
-        // Get BitToken using token id 
-        return TokenArr[_tokenId];
-    }
-
-
-
-
     function getTokenArr(
         uint[] memory _tokenIds
     ) public view returns (Token[] memory){
-        // Gets an array of BitToken(Token) objects
+        // Gets an array of Quantum token(Token) objects
         // when given an array of token ids 
         Token[] memory tokens = new Token[](_tokenIds.length);
         for (uint i=0;i<_tokenIds.length;i++){
@@ -205,35 +198,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         return tokens;
     }
 
-
-
-
-    function getActiveTokenIds(
-        bytes32 externalTokenHash
-    ) public view returns (uint[] memory) {
-        // Get the ids of all active tokens
-        // connected to an ExternalToken
-        ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash]; 
-        return externalToken.activeTokenIdsArr;
-    }
-
-
-    function getActiveTokenArr(
-        bytes32 externalTokenHash
-    ) public view returns (Token[] memory) {
-        // Get the BitToken(Token) objects of all
-        // active tokens connected to an ExternalToken
-        ExternalToken memory externalToken = ExternalTokenMap[externalTokenHash];
-        uint[] memory activeTokenIdsArr = externalToken.activeTokenIdsArr;
-
-        Token[] memory tokens = new Token[](activeTokenIdsArr.length);
-        for (uint i=0;i<activeTokenIdsArr.length;i++){
-            tokens[i] = TokenArr[activeTokenIdsArr[i]];
-        }
-        return tokens;
-    }
-
-    
+        
 
 
     function updateActiveTokenArr(
@@ -286,17 +251,21 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
             assert(token.hasBeenAltered == false);
             expectedTotal += token.portion;
         }
+        assert(expectedTotal==TOTAL);
+
+
+        for (uint i=0;i < activeTokenIdsArr.length;i++){
+            uint tokenId = activeTokenIdsArr[i];
+            Token storage token = TokenArr[tokenId];
+            token.hasBeenAltered = true; 
+            _burn(tokenId);           
+        }
 
         for (uint i=0; i < activeTokenIdsArr.length;i++){
            activeTokenIdsArr.pop();
         }
 
-        assert(expectedTotal==TOTAL);
 
-        for (uint i=0;i < activeTokenIdsArr.length;i++){
-            Token storage token = TokenArr[activeTokenIdsArr[i]];
-            token.hasBeenAltered = true;            
-        }
         uint externalTokenId = externalToken.tokenId;
         address contract_ = externalToken.contract_;
         ERC721 externalTokenContract = ERC721(contract_);
@@ -318,7 +287,7 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
         uint tokenId,
         bytes32 externalTokenHash 
     ) private whenNotPaused {
-        // This is a private function to mint a BitToken 
+        // This is a private function to mint a Quantum token 
         // representing 100% ownership of an external 
         // token on receipt of the external token
         // ExternalToken memory externalToken;
@@ -387,6 +356,25 @@ contract BitToken is ERC721,IERC721Receiver,Pausable,AccessControl {
     {
         super._beforeTokenTransfer(from, to, amount);
     }
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public virtual override {
+        revert UnImplemented();
+        
+    }
+
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) public virtual override {
+        revert UnImplemented();
+    }
+
 
 
 

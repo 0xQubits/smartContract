@@ -1,9 +1,10 @@
-const { expect, assert } = require("chai");
+const { expect} = require("chai");
 const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
-const {bigNumberToNumber,checkSumTotal, addressToString} = require("./utils");
+const { utils } = require("ethers");
+const {bigNumberToNumber,checkSumTotal} = require("./utils");
 
-let bitToken;
+let quantum;
 let game;
 let addr0;
 let addr1;
@@ -25,13 +26,13 @@ before(async function () {
     [addr0, addr1, addr2,addr3, ...addrs] = await ethers.getSigners();
     let sender = addr0;
 
-    const BitToken = await ethers.getContractFactory("BitToken");
-    bitToken = await BitToken.deploy();
+    const Quantum = await ethers.getContractFactory("Quantum");
+    quantum = await Quantum.deploy();
     const Game = await ethers.getContractFactory("Game");
     game = await Game.deploy();
-    await bitToken.deployed();
+    await quantum.deployed();
     await game.deployed();
-
+ 
     const mintGameTx = await game.awardItem(sender.address);
     await mintGameTx.wait();
     const mintGameTx2 = await game.awardItem(sender.address);
@@ -55,19 +56,19 @@ describe("Initialization", function () {
 
     it("Should that an external token can be sent to this contract", async function () {
         let sender = addr0;
-        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,firstGameTokenId);
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,firstGameTokenId);
         await safeTransferTx.wait();
-        expect(await game.ownerOf(firstGameTokenId)).to.equal(bitToken.address);
+        expect(await game.ownerOf(firstGameTokenId)).to.equal(quantum.address);
         
     }),  
    
     
-    it("Should ensure that a bitToken object is created \
+    it("Should ensure that a Quantum token object is created \
         which will represent 100% ownership of the ExternalToken", async function () {
         const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
         let sender = addr0;
-        let token = await bitToken.getToken(0);
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
+        let token = await quantum.TokenArr(0);
+        let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
         expect(token.owner).to.equal(sender.address);
         expect(token.portion).to.equal(MAX_PORTION); 
         expect(token.hasBeenAltered).to.equal(false);
@@ -79,8 +80,8 @@ describe("Initialization", function () {
 
     it("Should ensure that basic ExternalToken data is accurate", async function () {
         let sender = addr0;
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
-        let externalToken = await bitToken.getExternalToken(externalTokenHash)
+        let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
+        let externalToken = await quantum.getExternalToken(externalTokenHash)
         
         expect(externalToken.contract_ ).to.equal(game.address);
         expect(externalToken.senderArr).to.have.members([sender.address.toString()]);
@@ -111,18 +112,21 @@ describe("Split", function () {
             addr2.address,addr3.address];
         new_owners_portion = [1 * 10 ** 11, 3 * 10 ** 11,
                               2 * 10 ** 11, 4 * 10 ** 11];
-        let divisionTx = await bitToken.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
+        let divisionTx = await quantum.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
        
         for (let index in new_owners){  
             let newOwner = new_owners[index];
             let newOwnerPortion = new_owners_portion[index].toString();
-            await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
+            await expect(divisionTx).to.emit(quantum, 'OwnershipModified')
             .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            // Ensure token has been burned
+            await expect(divisionTx).to.emit(quantum, 'Transfer')
+            .withArgs(sender.address, AddressZero, splitTokenId);
         };
        
     })
-    checkBitTokenProperties(splitTokenId);
+    checkQuantumTokenProperties(splitTokenId);
     checkExternalTokenProperties(
         gameTokenId=0,
         historyArr=[0,1,2,3,4],
@@ -144,18 +148,21 @@ describe("Further split", function () {
         let sender = addr0;
         new_owners = [sender.address,addr1.address]
         new_owners_portion = [5 * 10 ** 10,5 * 10 ** 10]
-        let divisionTx = await bitToken.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
+        let divisionTx = await quantum.splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
         for (let index in new_owners){  
             let newOwner = new_owners[index];
             let newOwnerPortion = new_owners_portion[index].toString();
-            await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
+            await expect(divisionTx).to.emit(quantum, 'OwnershipModified')
             .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            // Ensure token has been burned
+            await expect(divisionTx).to.emit(quantum, 'Transfer')
+            .withArgs(sender.address, AddressZero, splitTokenId);
         };
     
     })
     
-    checkBitTokenProperties(splitTokenId);
+    checkQuantumTokenProperties(splitTokenId);
     checkExternalTokenProperties(
         gameTokenId=0,
         historyArr=[0,1,2,3,4,5,6],
@@ -173,18 +180,21 @@ describe("Further split with different account", function () {
         let sender = addr1;
         new_owners = [sender.address,addr2.address]
         new_owners_portion = [2 * 10 ** 11,1 * 10 ** 11]
-        let divisionTx = await bitToken.connect(sender).splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
+        let divisionTx = await quantum.connect(sender).splitTokenOwnership(splitTokenId,new_owners,new_owners_portion);
         await divisionTx.wait()
         for (let index in new_owners){  
             let newOwner = new_owners[index];
             let newOwnerPortion = new_owners_portion[index].toString();
-            await expect(divisionTx).to.emit(bitToken, 'OwnershipModified')
+            await expect(divisionTx).to.emit(quantum, 'OwnershipModified')
             .withArgs(sender.address, newOwner, firstGameTokenId,BigNumber.from(newOwnerPortion));
+            // Ensure token has been burned
+            await expect(divisionTx).to.emit(quantum, 'Transfer')
+            .withArgs(sender.address, AddressZero, splitTokenId);
         };
         
 
     })
-    checkBitTokenProperties(splitTokenId);
+    checkQuantumTokenProperties(splitTokenId);
     checkExternalTokenProperties(
         gameTokenId=0,
         historyArr=[0,1,2,3,4,5,6,7,8],
@@ -202,25 +212,29 @@ describe("Return Token", function () {
     
     it("Should send and return the token", async function () {
         let sender = addr0;
-        let externalTokenHash = bitToken.makeExternalTokenHash(game.address,thirdGameTokenId)
+        let externalTokenHash = quantum.makeExternalTokenHash(game.address,thirdGameTokenId)
 
         
-        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,thirdGameTokenId);
         await safeTransferTx.wait();
-        expect(await game.ownerOf(thirdGameTokenId)).to.equal(bitToken.address);
-        let externalToken = await bitToken.getExternalToken(externalTokenHash);
-        let activeTokenIdsArr = [9];
-        let historyArr = [9]; 
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(quantum.address);
+        let externalToken = await quantum.getExternalToken(externalTokenHash);
+        let newTokenId = 9;
+        let activeTokenIdsArr = [newTokenId];
+        let historyArr = [newTokenId]; 
         expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
 
 
-        let returnTx = await bitToken.connect(sender).returnToken(externalTokenHash);
-        await expect(returnTx).to.emit(bitToken, 'ExternalTokenReturn')
+        let returnTx = await quantum.connect(sender).returnToken(externalTokenHash);
+        await expect(returnTx).to.emit(quantum, 'ExternalTokenReturn')
         .withArgs(game.address, sender.address, thirdGameTokenId);
+        // Ensure old token has been burned
+        await expect(returnTx).to.emit(quantum, 'Transfer')
+        .withArgs(sender.address, AddressZero, newTokenId);
         
         activeTokenIdsArr = [];
-        externalToken = await bitToken.getExternalToken(externalTokenHash);
+        externalToken = await quantum.getExternalToken(externalTokenHash);
         expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
@@ -229,15 +243,16 @@ describe("Return Token", function () {
 
     it("Should send and return the token the second time", async function () {
         let sender = addr0;
-        let externalTokenHash = bitToken.makeExternalTokenHash(game.address,thirdGameTokenId)
+        let externalTokenHash = quantum.makeExternalTokenHash(game.address,thirdGameTokenId)
 
         
-        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,thirdGameTokenId);
         await safeTransferTx.wait();
-        expect(await game.ownerOf(thirdGameTokenId)).to.equal(bitToken.address);
-        let externalToken = await bitToken.getExternalToken(externalTokenHash);
-        let activeTokenIdsArr = [10];
-        let historyArr = [9,10]; 
+        expect(await game.ownerOf(thirdGameTokenId)).to.equal(quantum.address);
+        let externalToken = await quantum.getExternalToken(externalTokenHash);
+        let newTokenId = 10;
+        let activeTokenIdsArr = [newTokenId];
+        let historyArr = [9,newTokenId]; 
         let senderArr = [
             sender.address.toString(),
             sender.address.toString()
@@ -247,12 +262,15 @@ describe("Return Token", function () {
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
 
 
-        let returnTx = await bitToken.connect(sender).returnToken(externalTokenHash);
-        await expect(returnTx).to.emit(bitToken, 'ExternalTokenReturn')
+        let returnTx = await quantum.connect(sender).returnToken(externalTokenHash);
+        await expect(returnTx).to.emit(quantum, 'ExternalTokenReturn')
         .withArgs(game.address, sender.address, thirdGameTokenId);
+        // Ensure old token has been burned
+        await expect(returnTx).to.emit(quantum, 'Transfer')
+        .withArgs(sender.address, AddressZero, newTokenId);
         
         activeTokenIdsArr = [];
-        externalToken = await bitToken.getExternalToken(externalTokenHash);
+        externalToken = await quantum.getExternalToken(externalTokenHash);
         expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
@@ -270,7 +288,7 @@ describe("Illegal transactions", function () {
         let sender = addr1;
         new_owners = [sender.address];
         new_owners_portion = [1];
-        await expect(bitToken.connect(sender).splitTokenOwnership(0,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(0,new_owners,new_owners_portion))
         .to.be.revertedWith('Only the owner may split this token');
     }),
 
@@ -278,7 +296,7 @@ describe("Illegal transactions", function () {
         let sender = addr0;
         let new_owners = [sender.address];
         let new_owners_portion = [1];
-        await expect(bitToken.connect(sender).splitTokenOwnership(0,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(0,new_owners,new_owners_portion))
         .to.be.revertedWith('Token may not  be altered more than once');
     }),
 
@@ -287,26 +305,26 @@ describe("Illegal transactions", function () {
         let sender = addr0;
         let new_owners = [sender.address];
         let new_owners_portion = [1,2];
-        await expect(bitToken.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
         .to.be.revertedWith('The portion and address fields must be of equal length');
 
 
         new_owners = [sender.address,sender.address];
         new_owners_portion = [1];
-        await expect(bitToken.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
         .to.be.revertedWith('The portion and address fields must be of equal length');
 
 
         new_owners = [AddressZero];
         new_owners_portion = [1];
-        await expect(bitToken.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
         .to.be.revertedWith('Invalid recepient address included');
 
 
         new_owners = [addr2.address];
         new_owners_portion = [1];
         
-        await expect(bitToken.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
         .to.be.revertedWith('Incorrect portion allocation. They sum up to more or less than 100%');
 
         
@@ -319,7 +337,7 @@ describe("Illegal transactions", function () {
         let sender = addr1;
         let err_msg = `AccessControl: account ${addr1.address.toLowerCase()} is missing role ${MINTER_ROLE}`;
 
-        await expect(bitToken.connect(sender).pause())
+        await expect(quantum.connect(sender).pause())
         .to.be.revertedWith(err_msg);
 
     }),
@@ -327,33 +345,57 @@ describe("Illegal transactions", function () {
     it("Should ensure initialization and split can't\
         be done when paused",async function(){
         let sender = addr0
-        await bitToken.connect(sender).pause();
+        await quantum.connect(sender).pause();
         
-        await expect(game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,secondGameTokenId))
+        await expect(game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,secondGameTokenId))
         .to.be.revertedWith("Pausable: paused");
 
-        await expect(bitToken.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
+        await expect(quantum.connect(sender).splitTokenOwnership(5,new_owners,new_owners_portion))
         .to.be.revertedWith("Pausable: paused");
     }),
 
     it("Should ensure contract can be unpaused",async function(){
         let sender = addr0
-        await bitToken.connect(sender).unpause();
-        let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,secondGameTokenId);
+        await quantum.connect(sender).unpause();
+        let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,secondGameTokenId);
         await initTx.wait()
         
     }),
 
 
     it("Should ensure that only the owner can return token",async function(){
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,thirdGameTokenId);
+        let externalTokenHash = await quantum.makeExternalTokenHash(game.address,thirdGameTokenId);
         let sender = addr0;
-        let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,bitToken.address,thirdGameTokenId);
+        let  initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,thirdGameTokenId);
         await initTx.wait();
 
         
-        await expect(bitToken.connect(addr1).returnToken(externalTokenHash))
+        await expect(quantum.connect(addr1).returnToken(externalTokenHash))
         .to.be.revertedWith("Only the owner may return this token");
+        
+    })
+
+
+    it("Should ensure that the transferFrom and safeTransferFrom \
+        functions are unavailable ",async function(){
+       let sender = addr0;
+    
+
+        
+        await expect(
+            quantum["safeTransferFrom(address,address,uint256,bytes)"](sender.address,quantum.address,0,utils.formatBytes32String("random"))
+        )
+        .to.be.revertedWith("UnImplemented()");
+
+        await expect(
+            quantum["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,0)
+        )
+        .to.be.revertedWith("UnImplemented()");
+
+        await expect(
+            quantum.transferFrom(sender.address,quantum.address,0)
+        )
+        .to.be.revertedWith("UnImplemented()");
         
     })
     
@@ -364,13 +406,14 @@ describe("Illegal transactions", function () {
 
 
 
-function checkBitTokenProperties(splitTokenId) {
+function checkQuantumTokenProperties(splitTokenId) {
 
     it("Should ensure that the altered token\
         is no longer modifiable", async function () {
         
-        let dividedToken = await bitToken.getToken(splitTokenId); 
-        expect(dividedToken.hasBeenAltered, true, "The token should be altered");
+        let dividedToken = await quantum.TokenArr(splitTokenId); 
+        expect(dividedToken.hasBeenAltered).to.equal(true);
+        
     }),
 
 
@@ -381,8 +424,8 @@ function checkBitTokenProperties(splitTokenId) {
         for (i=startTokenIndex; i < endTokenIndex ;i++){
             let newOwner = new_owners[i-startTokenIndex];
             let newOwnerPortion = new_owners_portion[i-startTokenIndex];
-            let newToken = await bitToken.getToken(i);
-            let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,firstGameTokenId);
+            let newToken = await quantum.TokenArr(i);
+            let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
 
             expect(newToken.owner).to.equal(newOwner)
             expect(newToken.portion).to.equal(newOwnerPortion);
@@ -404,8 +447,8 @@ function checkExternalTokenProperties(
     
     it("Should ensure that an ExternalToken\
         object has all the correct properties", async function () {
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId);
-        let externalToken = await bitToken.getExternalToken(externalTokenHash);
+        let externalTokenHash = await quantum.makeExternalTokenHash(game.address,gameTokenId);
+        let externalToken = await quantum.getExternalToken(externalTokenHash);
 
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
         expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
@@ -413,7 +456,7 @@ function checkExternalTokenProperties(
     }),
 
     it("Should ensure that the active token array sums up to 100%  ", async function () {
-        let externalTokenHash = await bitToken.makeExternalTokenHash(game.address,gameTokenId);
+        let externalTokenHash = await quantum.makeExternalTokenHash(game.address,gameTokenId);
         checkSumTotal(externalTokenHash);
     })
 }
