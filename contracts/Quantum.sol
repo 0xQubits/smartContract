@@ -26,6 +26,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
 
     struct Token {
         // Stores Quantum token information
+        uint id;
         address owner;
         uint portion;
         bool hasBeenAltered;
@@ -39,7 +40,8 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
     // The value that denotes 100% ownership of an externalToken
     uint public constant TOTAL = uint(10)**DECIMAL; // 10 ^ 12
     mapping(bytes32 => ExternalToken) public ExternalTokenMap;
-    Token[] public TokenArr;
+    mapping(uint => Token) public TokenMap;
+    
 
     // ROLES
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -73,28 +75,25 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         // This is a private function for token mint
         ExternalToken storage externalToken;
         externalToken = ExternalTokenMap[externalTokenHash];
-        // make sure external token object exists
-        // added this after discovery of a previous bug
+        
         assert(externalToken.contract_ != address(0));
 
-        //////////// Actual Mint ///////////
+        
         // using safeMint can lead to unexpected behaviour
-        // if this function is called from a loop and
-        // one of the receivers cannot receive the token
         uint tokenId = _tokenIdCounter.current();
         _mint(to, tokenId); 
         _tokenIdCounter.increment();
 
         
-        // create token object and add it 
-        // to the array of existing tokens
+        // create token object 
         Token memory token;
+        token.id = tokenId;
         token.owner = to;
         token.portion = portion;
         token.hasBeenAltered = false;
         token.externalTokenHash = externalTokenHash;
         token.parentId = parentId;
-        TokenArr.push(token);
+        TokenMap[tokenId] = token;
         
         // add transaction to history
         externalToken.historyArr.push(tokenId);
@@ -123,7 +122,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
             // This means that if A plan's to retain a portion of it
             // He must also assign a portion to himself 
 
-            Token storage token = TokenArr[_tokenId];
+            Token storage token = TokenMap[_tokenId];
             assert(token.owner != address(0));
             require(token.owner == msg.sender,"Only the owner may split this token");
             require(token.hasBeenAltered == false,"Token may not  be altered more than once");
@@ -137,12 +136,9 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
             }
             require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
 
-            // VERY IMPORTANT to state that
-            // token has been modified and 
-            // BURN the old token
-            token.hasBeenAltered = true;
-            _burn(_tokenId);
+            updateAlteredToken(token);
             
+
             uint[] memory newlyCreatedTokenIds = new uint[](_new_owners.length);
 
 
@@ -176,7 +172,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
     }
 
 
-   function getExternalToken(
+    function getExternalToken(
         bytes32 externalTokenHash
     ) public view returns (ExternalToken memory){
         // Get ExternalToken object using hash
@@ -184,21 +180,23 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
     }
 
 
-
-
-    function getTokenArr(
+    function getArrOfTokens(
         uint[] memory _tokenIds
     ) public view returns (Token[] memory){
         // Gets an array of Quantum token(Token) objects
         // when given an array of token ids 
         Token[] memory tokens = new Token[](_tokenIds.length);
         for (uint i=0;i<_tokenIds.length;i++){
-            tokens[i] = TokenArr[_tokenIds[i]];
+            tokens[i] = TokenMap[_tokenIds[i]];
         }
         return tokens;
     }
 
-        
+    function updateAlteredToken(Token storage token) private {
+            // update state of altered token
+            token.hasBeenAltered = true;
+            _burn(token.id);
+    }
 
 
     function updateActiveTokenArr(
@@ -246,7 +244,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         assert(activeTokenIdsArr.length > 0);
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             uint tokenId = activeTokenIdsArr[i];
-            Token storage token = TokenArr[tokenId];
+            Token storage token = TokenMap[tokenId];
             require(token.owner != address(0));
             require(token.owner == msg.sender,"Only the owner may return this token");
             assert(token.hasBeenAltered == false);
@@ -259,9 +257,9 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         assert(activeTokenIdsArr.length > 0);
         for (uint i=0;i < activeTokenIdsArr.length;i++){
             uint tokenId = activeTokenIdsArr[i];
-            Token storage token = TokenArr[tokenId];
-            token.hasBeenAltered = true; 
-            _burn(tokenId);
+            Token storage token = TokenMap[tokenId];  
+            
+            updateAlteredToken(token);
                     
         }
 

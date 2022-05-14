@@ -3,11 +3,11 @@ async function main() {
   
     
     const Quantum = await ethers.getContractFactory("Quantum");
-    const quantum = await Quantum.attach("0xdDbc6c0B82Bdf20ef700Ca4F8736e0C62526E1B3");
+    const quantum = await Quantum.attach("0x277B336C58fbE062167f126AD90b06d43dd7fe29");
 
 
-    const Game = await ethers.getContractFactory("Game");
-    const game = await Game.attach("0x19f6d2E4Cb2e228fb9cEE518fe4FBffE3B7289bD");
+    // const Game = await ethers.getContractFactory("Game");
+    // const game = await Game.attach("0x80797184053baa621915faa580e3d596fc2edad9");
     // const mintGameTx = await game.awardItem(sender.address);
     // await mintGameTx.wait();
     
@@ -15,10 +15,11 @@ async function main() {
     // let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address,quantum.address,gameTokenId);
     // await safeTransferTx.wait();
     
-    new_owners = ["0xf8869fD097741977Ec64b4b2A493B297598eb623",sender.address];
-    new_owners_portion = [9 * 10 ** 11, 1 * 10 ** 11];
-    let divisionTx = await quantum.splitTokenOwnership(0,new_owners,new_owners_portion);
-    r = await divisionTx.wait()
+    let externalTokenHash = "0x9517c768089db27b1ec29b54ee5cf0b734973de14432d4d85111534d3f8061b5"
+    
+    let tx = await quantum.returnToken(externalTokenHash);
+    r = await tx.wait()
+    console.log(r)
     
 
   }

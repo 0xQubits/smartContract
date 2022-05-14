@@ -32,6 +32,8 @@ before(async function () {
     game = await Game.deploy();
     await quantum.deployed();
     await game.deployed();
+    console.log("Game ",game.address)
+    console.log("Quantum ",quantum.address)
  
     const mintGameTx = await game.awardItem(sender.address);
     await mintGameTx.wait();
@@ -67,7 +69,7 @@ describe("Initialization", function () {
         which will represent 100% ownership of the ExternalToken", async function () {
         const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
         let sender = addr0;
-        let token = await quantum.TokenArr(0);
+        let token = await quantum.TokenMap(0);
         let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
         expect(token.owner).to.equal(sender.address);
         expect(token.portion).to.equal(MAX_PORTION); 
@@ -411,7 +413,7 @@ function checkQuantumTokenProperties(splitTokenId) {
     it("Should ensure that the altered token\
         is no longer modifiable", async function () {
         
-        let dividedToken = await quantum.TokenArr(splitTokenId); 
+        let dividedToken = await quantum.TokenMap(splitTokenId); 
         expect(dividedToken.hasBeenAltered).to.equal(true);
         
     }),
@@ -424,7 +426,8 @@ function checkQuantumTokenProperties(splitTokenId) {
         for (i=startTokenIndex; i < endTokenIndex ;i++){
             let newOwner = new_owners[i-startTokenIndex];
             let newOwnerPortion = new_owners_portion[i-startTokenIndex];
-            let newToken = await quantum.TokenArr(i);
+            let newToken = await quantum.TokenMap(i);
+            console.log(newToken)
             let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
 
             expect(newToken.owner).to.equal(newOwner)
