@@ -1,3 +1,6 @@
+
+// incomplete tests for UserActiveTokenMap 
+
 const { expect} = require("chai");
 const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
@@ -32,6 +35,7 @@ before(async function () {
     game = await Game.deploy();
     await quantum.deployed();
     await game.deployed();
+    console.log(quantum)
     console.log("Game ",game.address)
     console.log("Quantum ",quantum.address)
  
@@ -70,12 +74,18 @@ describe("Initialization", function () {
         const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
         let sender = addr0;
         let token = await quantum.TokenMap(0);
+        
         let externalTokenHash = await quantum.makeExternalTokenHash(game.address,firstGameTokenId);
         expect(token.owner).to.equal(sender.address);
         expect(token.portion).to.equal(MAX_PORTION); 
         expect(token.hasBeenAltered).to.equal(false);
         expect(token.externalTokenHash).to.equal(externalTokenHash);
         expect(token.parentId).to.equal(MAX_INT_BIGNUMBER);
+        
+        let userActiveTokenArr = [0];
+        let userActiveTokensTx = await quantum.getUserActiveTokens(sender.address);
+        expect(userActiveTokensTx.map(bigNumberToNumber))
+        .to.have.members(userActiveTokenArr);
 
         
     }),
