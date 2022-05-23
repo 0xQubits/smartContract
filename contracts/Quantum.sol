@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 
 contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
@@ -142,7 +142,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
             }
             require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
 
-            updateAlteredToken(token,msg.sender,0);
+            updateAlteredToken(token,msg.sender);
             
 
             uint[] memory newlyCreatedTokenIds = new uint[](_new_owners.length);
@@ -206,21 +206,20 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
 
     function updateAlteredToken(
         Token storage token,
-        address formerOwnerAddress,
-        uint counter
+        address formerOwnerAddress
         ) private {
             // update state of altered token
             token.hasBeenAltered = true;
             _burn(token.id);
-            if (counter==0){
-                uint[] storage userActiveTokens = UserActiveTokenMap[formerOwnerAddress];
-                for (uint i=0;i<userActiveTokens.length;i++){
-                    if (userActiveTokens[i] == token.id){
-                        userActiveTokens[i] = userActiveTokens[userActiveTokens.length - 1];
-                        userActiveTokens.pop();
-                    }
+            uint[] storage userActiveTokens = UserActiveTokenMap[formerOwnerAddress];
+            for (uint i=0;i < userActiveTokens.length;i++){
+                if (userActiveTokens[i] == token.id){
+                    userActiveTokens[i] = userActiveTokens[userActiveTokens.length - 1];
+                    userActiveTokens.pop();
+                    break;
                 }
             }
+            
             
     }
 
@@ -288,14 +287,16 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
             uint tokenId = activeTokenIdsArr[i];
             Token storage token = TokenMap[tokenId];  
             
-            updateAlteredToken(token,msg.sender,i);
+            updateAlteredToken(token,msg.sender);
                     
         }
-
-        for (uint i=0; i < activeTokenIdsArr.length;i++){
+        
+        
+        uint len = activeTokenIdsArr.length;
+        for (uint i=0; i < len;i++){
            activeTokenIdsArr.pop();
         }
-       
+        
 
         assert(activeTokenIdsArr.length == 0);
         
