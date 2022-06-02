@@ -5,12 +5,12 @@ async function main() {
   
     console.log("Account balance:", (await deployer.getBalance()).toString());
   
-    const Quantum = await ethers.getContractFactory("Quantum");
-    const quantum = await Quantum.deploy();
+    const Qubits = await ethers.getContractFactory("Qubits");
+    const qubits = await Qubits.deploy();
     // const Game = await ethers.getContractFactory("Game");
     // const game = await Game.deploy();
   
-    console.log("Quantum Contract address:", quantum.address);
+    console.log("Qubits Contract address:", qubits.address);
     // console.log("Game Contract address:", game.address);
   }
   

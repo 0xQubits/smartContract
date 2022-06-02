@@ -10,7 +10,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "hardhat/console.sol";
 
 
-contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
+contract Qubits is ERC721,IERC721Receiver,Pausable,AccessControl {
     
     // struct and variables
     struct ExternalToken {
@@ -20,13 +20,13 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         address contract_;
         uint tokenId;
         uint[] historyArr;
-        // Quantum token Ids of all current owners 
+        // Qubits token Ids of all current owners 
         uint[] activeTokenIdsArr; 
 
     }
 
     struct Token {
-        // Stores Quantum token information
+        // Stores Qubits token information
         uint id;
         address owner;
         uint portion;
@@ -59,7 +59,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
 
 
 
-    constructor() ERC721("Quantum", "QTM") {
+    constructor() ERC721("Qubits", "QTM") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -120,7 +120,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
 
         )  public whenNotPaused {
             // This is a public function that spilts ownership 
-            // of a Quantum token. In order for this to work, the 
+            // of a Qubits token. In order for this to work, the 
             // owner has to reassign 100% of whatever portion 
             // the owner has.
             // E.g if A's token portion is 200 (out of TOTAL),
@@ -195,7 +195,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
     function getArrOfTokens(
         uint[] memory _tokenIds
     ) public view returns (Token[] memory){
-        // Gets an array of Quantum token(Token) objects
+        // Gets an array of Qubits token(Token) objects
         // when given an array of token ids 
         Token[] memory tokens = new Token[](_tokenIds.length);
         for (uint i=0;i<_tokenIds.length;i++){
@@ -323,7 +323,7 @@ contract Quantum is ERC721,IERC721Receiver,Pausable,AccessControl {
         uint tokenId,
         bytes32 externalTokenHash 
     ) private whenNotPaused {
-        // This is a private function to mint a Quantum token 
+        // This is a private function to mint a Qubits token 
         // representing 100% ownership of an external 
         // token on receipt of the external token
         // ExternalToken memory externalToken;

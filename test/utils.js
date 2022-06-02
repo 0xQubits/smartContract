@@ -9,7 +9,7 @@ function addressToString(address){
 }
 
 async function checkSumTotal(externalTokenHash){
-    let activeTokens = await quantum.getActiveTokenArr(externalTokenHash);
+    let activeTokens = await qubits.getActiveTokenArr(externalTokenHash);
     let total = 0;
     for (token of activeTokens){
         total+=token.portion.toNumber();
