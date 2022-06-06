@@ -1,4 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
+require('hardhat-contract-sizer');
 require('dotenv').config({path:__dirname+'/.env'});
 
 /**
@@ -18,7 +19,16 @@ module.exports = {
 
     },  
   },
-  // mocha: {
-  //   timeout: 100000000
+  // settings:{
+  //   optimizer: {
+  //     enabled: true,
+  //     runs: 20,
+  //   },
   // },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
+    strict: true,
+  },
 };

@@ -6,6 +6,7 @@ const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
 const { utils } = require("ethers");
 const { bigNumberToNumber, checkSumTotal } = require("./utils");
+const { ethers } = require("hardhat");
 
 let qubits;
 let game;
@@ -28,8 +29,16 @@ before(async function () {
 
     [addr0, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
     let sender = addr0;
+    const UtilsLibraryFactory = await ethers.getContractFactory("Utils");
+    utilsLibrary = await UtilsLibraryFactory.deploy();
 
-    const Qubits = await ethers.getContractFactory("Qubits");
+    const Qubits = await ethers.getContractFactory("Qubits", {
+        libraries: {
+          Utils: utilsLibrary.address,
+        },
+      });
+
+    
     qubits = await Qubits.deploy();
     const Game = await ethers.getContractFactory("Game");
     game = await Game.deploy();

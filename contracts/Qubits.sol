@@ -2,394 +2,297 @@
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "hardhat/console.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "./library/Utils.sol";
+import "./library/SharedVariable.sol";
+import "./Storage.sol";
 
-
-contract Qubits is ERC721,IERC721Receiver,Pausable,AccessControl {
-    
-    // struct and variables
-    struct ExternalToken {
-        // Stores information on the
-        // received External Token
-        address[] senderArr;
-        address contract_;
-        uint tokenId;
-        uint[] historyArr;
-        // Qubits token Ids of all current owners 
-        uint[] activeTokenIdsArr; 
-
-    }
-
-    struct Token {
-        // Stores Qubits token information
-        uint id;
-        address owner;
-        uint portion;
-        bool hasBeenAltered;
-        bytes32 externalTokenHash;
-        uint parentId;
-    }
-
-    using Counters for Counters.Counter;
-    Counters.Counter private _tokenIdCounter;
-    uint public constant DECIMAL = uint(12);
+contract Qubits is
+    ERC721Upgradeable,
+    IERC721ReceiverUpgradeable,
+    PausableUpgradeable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
+    using CountersUpgradeable for CountersUpgradeable.Counter;
+    CountersUpgradeable.Counter private _tokenIdCounter;
+    uint256 public constant DECIMAL = uint256(12);
     // The value that denotes 100% ownership of an externalToken
-    uint public constant TOTAL = uint(10)**DECIMAL; // 10 ^ 12
-    mapping(bytes32 => ExternalToken) public ExternalTokenMap;
-    mapping(uint => Token) public TokenMap;
-    mapping(address => uint[]) public UserActiveTokenMap;
-    
+    uint256 public constant TOTAL = uint256(10)**DECIMAL; // 10 ^ 12
+
+    // external contract addresses
+    address activeTokenAddress;
+    address externalTokenStorageAddress;
+    address internalTokenStorageAddress;
 
     // ROLES
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     // Events
-    event InitializedExternalToken(address contract_ ,address sender, uint tokenId);
-    event OwnershipModified(address from ,address to, uint externalTokenId,uint portion );
-    event ExternalTokenReturn(address contract_ ,address owner, uint externalTokenId);
-    
+    event InitializedExternalToken(
+        address contract_,
+        address sender,
+        uint256 tokenId
+    );
+    event OwnershipModified(
+        address from,
+        address to,
+        uint256 externalTokenId,
+        uint256 portion
+    );
+    event ExternalTokenReturn(
+        address contract_,
+        address owner,
+        uint256 externalTokenId
+    );
+
     //Errors
     error UnImplemented();
 
-
-
-    constructor() ERC721("Qubits", "QTM") {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
+    function initialize(
+        address _activeTokenAddress,
+        address _externalTokenStorageAddress,
+        address _internalTokenStorageAddress
+    ) public initializer {
+        __ERC721_init("Qubits", "QTK");
+        __Pausable_init();
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSER_ROLE, msg.sender);
+        _grantRole(MINTER_ROLE, msg.sender);
+        _grantRole(UPGRADER_ROLE, msg.sender);
 
+        activeTokenAddress = _activeTokenAddress;
+        externalTokenStorageAddress = _externalTokenStorageAddress;
+        internalTokenStorageAddress = _internalTokenStorageAddress;
+    }
 
     function mintToken(
-            address from,
-            address to,
-            uint portion,
-            bytes32 externalTokenHash,
-            uint parentId
-        ) private returns (uint){
+        address from,
+        address to,
+        uint256 portion,
+        bytes32 _hash,
+        uint256 parentId
+    ) private returns (uint256) {
         // This is a private function for token mint
-        ExternalToken storage externalToken;
-        externalToken = ExternalTokenMap[externalTokenHash];
-        
-        assert(externalToken.contract_ != address(0));
 
-        
         // using safeMint can lead to unexpected behaviour
-        uint tokenId = _tokenIdCounter.current();
-        _mint(to, tokenId); 
+        uint256 tokenId = _tokenIdCounter.current();
+        _mint(to, tokenId);
         _tokenIdCounter.increment();
 
-        
-        // create token object 
-        Token memory token;
-        token.id = tokenId;
-        token.owner = to;
-        token.portion = portion;
-        token.hasBeenAltered = false;
-        token.externalTokenHash = externalTokenHash;
-        token.parentId = parentId;
-        TokenMap[tokenId] = token;
-        
-        // add transaction to history
-        externalToken.historyArr.push(tokenId);
-        // update user active token map
-        uint[] storage userActiveTokens = UserActiveTokenMap[to];
-        userActiveTokens.push(tokenId);
-        
+        // create internal token object
+        InternalTokenStorage(internalTokenStorageAddress).create(
+            tokenId,
+            to,
+            portion,
+            _hash,
+            parentId
+        );
 
-        emit OwnershipModified(from,to,externalToken.tokenId,portion);
+        //update external token storage
+        uint256 exTokenId = ExternalTokenStorage(externalTokenStorageAddress)
+            .add(_hash, tokenId);
+
+        // update user active token map
+        ActiveTokenStorage(activeTokenAddress).add(to, tokenId);
+
+        emit OwnershipModified(from, to, exTokenId, portion);
         return tokenId;
     }
 
-
-
-
-
-
     function splitTokenOwnership(
-        uint _tokenId,
-        address[] memory _new_owners, 
-        uint[] memory _new_owners_portion
-
-        )  public whenNotPaused {
-            // This is a public function that spilts ownership 
-            // of a Qubits token. In order for this to work, the 
-            // owner has to reassign 100% of whatever portion 
-            // the owner has.
-            // E.g if A's token portion is 200 (out of TOTAL),
-            // the sum of _new_owners_portion must be 200.
-            // This means that if A plan's to retain a portion of it
-            // He must also assign a portion to himself 
-
-            Token storage token = TokenMap[_tokenId];
-            assert(token.owner != address(0));
-            require(token.owner == msg.sender,"Only the owner may split this token");
-            require(token.hasBeenAltered == false,"Token may not  be altered more than once");
-            require(_new_owners.length == _new_owners_portion.length,"The portion and address fields must be of equal length");
-
-            uint total = 0;
-            for (uint i=0;i < _new_owners.length;i++){
-                require(_new_owners[i] != address(0),"Invalid recepient address included");
-                require(_new_owners_portion[i] <= token.portion,"You can't transfer more than 100% of your holding");
-                total += _new_owners_portion[i];
-            }
-            require(total == token.portion,"Incorrect portion allocation. They sum up to more or less than 100%");
-
-            updateAlteredToken(token,msg.sender);
-            
-
-            uint[] memory newlyCreatedTokenIds = new uint[](_new_owners.length);
-
-
-            for (uint i=0;i < _new_owners.length;i++){
-                uint new_token_id;
-                new_token_id =mintToken(
-                      token.owner,
-                     _new_owners[i],
-                     _new_owners_portion[i],
-                     token.externalTokenHash,
-                     _tokenId
-                );
-                newlyCreatedTokenIds[i] = new_token_id;
-            }
-            updateActiveTokenArr(
-                token.externalTokenHash,
-                _tokenId,
-                newlyCreatedTokenIds
-            );
-
-            
-        
-    }
-
-    function makeExternalTokenHash(
-        address _contract_address,
-        uint _tokenId
-    ) public pure returns (bytes32) {
-        // constructs hash from external contract address and token id
-        return keccak256(abi.encodePacked(_contract_address, _tokenId));
-    }
-
-    function getUserActiveTokens(
-        address _address
-    ) public view returns (uint[] memory){
-        return UserActiveTokenMap[_address];
-    }
-
-
-    function getExternalToken(
-        bytes32 externalTokenHash
-    ) public view returns (ExternalToken memory){
-        // Get ExternalToken object using hash
-        return ExternalTokenMap[externalTokenHash];
-    }
-
-
-    function getArrOfTokens(
-        uint[] memory _tokenIds
-    ) public view returns (Token[] memory){
-        // Gets an array of Qubits token(Token) objects
-        // when given an array of token ids 
-        Token[] memory tokens = new Token[](_tokenIds.length);
-        for (uint i=0;i<_tokenIds.length;i++){
-            tokens[i] = TokenMap[_tokenIds[i]];
-        }
-        return tokens;
-    }
-
-    function updateAlteredToken(
-        Token storage token,
-        address formerOwnerAddress
-        ) private {
-            // update state of altered token
-            token.hasBeenAltered = true;
-            _burn(token.id);
-            uint[] storage userActiveTokens = UserActiveTokenMap[formerOwnerAddress];
-            for (uint i=0;i < userActiveTokens.length;i++){
-                if (userActiveTokens[i] == token.id){
-                    userActiveTokens[i] = userActiveTokens[userActiveTokens.length - 1];
-                    userActiveTokens.pop();
-                    break;
-                }
-            }
-            
-            
-    }
-
-
-    function updateActiveTokenArr(
-        bytes32 externalTokenHash,
-        uint outgoingTokenId,
-        uint[] memory incomingTokenIds
-    ) private {
-        // This is a private function that updates the 
-        // active token array of an ExternalToken object
-        assert(incomingTokenIds.length > 0);
-        
-        ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
-        uint[] storage activeTokenIdsArr = externalToken.activeTokenIdsArr;
-        for (uint i=0; i < activeTokenIdsArr.length;i++){
-            uint tokenId = activeTokenIdsArr[i];
-            if (tokenId == outgoingTokenId){
-                activeTokenIdsArr[i] = incomingTokenIds[0];
-                if (incomingTokenIds.length>1){
-                    for (uint j=1;j<incomingTokenIds.length;j++){
-                      activeTokenIdsArr.push(incomingTokenIds[j]);
-                    }
-                    break;
-                }
-                
-            }
-        }
-    }
-
-    
-
-    
-
-    function returnToken(
-        bytes32 externalTokenHash
-
+        uint256 _tokenId,
+        address[] memory _new_owners,
+        uint256[] memory _new_owners_portion
     ) public whenNotPaused {
-        // This is a public function to take the token out of 
+        // This is a public function that spilts ownership of a Qubits token. 
+
+        InternalTokenStorage intTokenContract = InternalTokenStorage(
+            internalTokenStorageAddress
+        );
+
+
+        intTokenContract.checkTransferPermission(_tokenId);
+        intTokenContract.validateTransferParameters(
+            _tokenId,
+            _new_owners,
+            _new_owners_portion
+        );
+
+        InternalToken memory intToken = intTokenContract.get(_tokenId);
+
+        updateTransferredInternalToken(_tokenId, msg.sender);
+
+        uint256[] memory newlyCreatedTokenIds = new uint256[](
+            _new_owners.length
+        );
+
+        for (uint256 i = 0; i < _new_owners.length; i++) {
+            uint256 new_token_id;
+            new_token_id = mintToken(
+                intToken.owner,
+                _new_owners[i],
+                _new_owners_portion[i],
+                intToken.externalTokenHash,
+                _tokenId
+            );
+            newlyCreatedTokenIds[i] = new_token_id;
+        }
+
+        // update external token active token ids arr
+        ExternalTokenStorage(externalTokenStorageAddress).update(
+            intToken.externalTokenHash,
+            newlyCreatedTokenIds,
+            _tokenId
+        );
+    }
+
+    
+
+    function updateTransferredInternalToken(
+        uint tokenId,
+        address formerOwnerAddress
+        )
+        private
+    {
+        // update state of altered token
+        _burn(tokenId);
+
+        InternalTokenStorage intTokenStorageContract = InternalTokenStorage(internalTokenStorageAddress); 
+        intTokenStorageContract.invalidate(tokenId);
+        ActiveTokenStorage(activeTokenAddress).update(
+            tokenId,
+            formerOwnerAddress
+        );
+    }
+
+    function returnToken(bytes32 externalTokenHash) public whenNotPaused {
+        // This is a public function to take the token out of
         // this contract and back to the ExternalToken contract
 
         // The person calling this contract must own all
-        // the active tokens connected to the ExternalToken 
+        // the active tokens connected to the ExternalToken
 
-        uint expectedTotal = 0;
-        ExternalToken storage externalToken;
-        externalToken =  ExternalTokenMap[externalTokenHash];
-        uint[] storage activeTokenIdsArr = externalToken.activeTokenIdsArr;
-        
-        assert(activeTokenIdsArr.length > 0);
-        for (uint i=0;i < activeTokenIdsArr.length;i++){
-            uint tokenId = activeTokenIdsArr[i];
-            Token storage token = TokenMap[tokenId];
-            require(token.owner != address(0));
-            require(token.owner == msg.sender,"Only the owner may return this token");
-            assert(token.hasBeenAltered == false);
-            expectedTotal += token.portion;
-        }
-        assert(expectedTotal==TOTAL);
+        ExternalTokenStorage externalStorageContract = ExternalTokenStorage(
+            externalTokenStorageAddress
+        );
+        InternalTokenStorage internalStorageContract = InternalTokenStorage(
+            internalTokenStorageAddress
+        );
 
-
+        uint256[] memory activeTokenIdsArr = externalStorageContract
+            .get(externalTokenHash)
+            .activeTokenIdsArr;
 
         assert(activeTokenIdsArr.length > 0);
-        for (uint i=0;i < activeTokenIdsArr.length;i++){
-            uint tokenId = activeTokenIdsArr[i];
-            Token storage token = TokenMap[tokenId];  
-            
-            updateAlteredToken(token,msg.sender);
-                    
+        uint256 expectedTotal = 0;
+
+        for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
+            uint256 tokenId = activeTokenIdsArr[i];
+            InternalToken memory intToken = internalStorageContract.get(tokenId);
+            internalStorageContract.checkTransferPermission(tokenId);
+            expectedTotal += intToken.portion;
         }
-        
-        
-        uint len = activeTokenIdsArr.length;
-        for (uint i=0; i < len;i++){
-           activeTokenIdsArr.pop();
+        assert(expectedTotal == TOTAL);
+
+        assert(activeTokenIdsArr.length > 0);
+        for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
+            uint256 tokenId = activeTokenIdsArr[i];
+            InternalToken memory intToken = internalStorageContract.get(tokenId);
+            updateTransferredInternalToken(intToken.id, msg.sender);
         }
-        
 
-        assert(activeTokenIdsArr.length == 0);
-        
+        externalStorageContract.clearActive(externalTokenHash);
 
-
-        uint externalTokenId = externalToken.tokenId;
+        ExternalToken memory externalToken = externalStorageContract.get(
+            externalTokenHash
+        );
+        uint256 externalTokenId = externalToken.tokenId;
         address contract_ = externalToken.contract_;
         ERC721 externalTokenContract = ERC721(contract_);
-        externalTokenContract.transferFrom(address(this),msg.sender,externalToken.tokenId);
+        externalTokenContract.transferFrom(
+            address(this),
+            msg.sender,
+            externalTokenId
+        );
 
         emit ExternalTokenReturn(contract_, msg.sender, externalTokenId);
     }
 
-
-
-
-
-
-
-
     function initializeExternalToken(
-        address contract_, 
+        address contract_,
         address sender,
-        uint tokenId,
-        bytes32 externalTokenHash 
+        uint256 tokenId,
+        bytes32 externalTokenHash
     ) private whenNotPaused {
-        // This is a private function to mint a Qubits token 
-        // representing 100% ownership of an external 
+        // This is a private function to mint a Qubits token
+        // representing 100% ownership of an external
         // token on receipt of the external token
         // ExternalToken memory externalToken;
-        ExternalToken storage externalToken = ExternalTokenMap[externalTokenHash];
-        if (externalToken.senderArr.length != 0){
-            externalToken.senderArr.push(sender);
+        ExternalTokenStorage exTokenStorageContract = ExternalTokenStorage(
+            externalTokenStorageAddress
+        );
+        exTokenStorageContract.createStart(
+            externalTokenHash,
+            sender,
+            contract_,
+            tokenId
+        );
 
-        } else {
-            address[] memory senderArr = new address[](1);
-            senderArr[0] = sender;
+        uint256 MAX_INT = uint256(2**256 - 1);
+        uint256 newTokenId = mintToken(
+            sender,
+            sender,
+            TOTAL,
+            externalTokenHash,
+            MAX_INT
+        );
 
-            externalToken.contract_ = contract_;
-            externalToken.senderArr = senderArr;
-            externalToken.tokenId = tokenId;
-        } 
-        
+        exTokenStorageContract.createFinish(externalTokenHash, newTokenId);
 
-        // set this so that the mintToken function can access it
-        ExternalTokenMap[externalTokenHash] = externalToken;
-
-        uint[] memory newlyCreatedTokenIds = new uint[](1);
-        uint MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-        uint newlyCreatedTokenId = mintToken(sender,sender,TOTAL,externalTokenHash,MAX_INT);
-        
-        newlyCreatedTokenIds[0] = newlyCreatedTokenId;
-        ExternalToken storage externalTokenRefreshed = ExternalTokenMap[externalTokenHash];
-        externalTokenRefreshed.activeTokenIdsArr = newlyCreatedTokenIds;
-
-        emit InitializedExternalToken(contract_,sender,tokenId);
-
+        emit InitializedExternalToken(contract_, sender, tokenId);
     }
-
-
-
 
     function onERC721Received(
         address operator,
         address from,
-        uint tokenId,
+        uint256 tokenId,
         bytes memory
     ) public virtual override returns (bytes4) {
+        bytes32 externalTokenHash = Utils.makeHash(tokenId);
+        initializeExternalToken(msg.sender, from, tokenId, externalTokenHash);
 
-        bytes32 externalTokenHash = makeExternalTokenHash(msg.sender, tokenId);
-        initializeExternalToken(msg.sender,from,tokenId,externalTokenHash);
-        
         return this.onERC721Received.selector;
     }
-
 
     function pause() public onlyRole(PAUSER_ROLE) {
         _pause();
     }
 
-    
-    
     function unpause() public onlyRole(PAUSER_ROLE) {
         _unpause();
     }
 
-
-
-    function _beforeTokenTransfer(address from, address to, uint256 amount)
-        internal
-        whenNotPaused
-        override
-    {
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, amount);
     }
 
@@ -399,7 +302,6 @@ contract Qubits is ERC721,IERC721Receiver,Pausable,AccessControl {
         uint256 tokenId
     ) public virtual override {
         revert UnImplemented();
-        
     }
 
     function safeTransferFrom(
@@ -411,13 +313,16 @@ contract Qubits is ERC721,IERC721Receiver,Pausable,AccessControl {
         revert UnImplemented();
     }
 
-
-
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyRole(UPGRADER_ROLE)
+    {}
 
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, AccessControl)
+        override(ERC721Upgradeable, AccessControlUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
