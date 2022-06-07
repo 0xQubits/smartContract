@@ -2,34 +2,34 @@
   "manifestVersion": "3.2",
   "admin": {
     "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-    "txHash": "0x3017f0535824dcae1c2dcb5bc14167aae21b2b0237577360f80d8f3134bc2d08"
+    "txHash": "0x7f2d43b413d90a063e9d869909d2ab227ccd3499c2253e513fe17af20b4a444f"
   },
   "proxies": [
     {
       "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "txHash": "0x8ced2bbcaadd20b061fb11589415330329f27324a6882f2b19745a860883faba",
+      "txHash": "0xa5a5d1e93f7c98bf6bb105b53a510e630c8fe6b48b115220c437c552b58c0d25",
       "kind": "transparent"
     },
     {
       "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
-      "txHash": "0xf74120af08bed848980379bd08364e5abe72dfe2274c4ef17e8822406bfa32f8",
+      "txHash": "0xf8dd23e08ba3c3b04da37176fc589366cdc66b9b17b14d6dc65797afcdce040b",
       "kind": "transparent"
     },
     {
       "address": "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
-      "txHash": "0x50750316b2622172720a7d9a0d54a82436142648ca9a22491455613e43b6c3c8",
+      "txHash": "0x43d5ff3987746a0b34c7cd8f6a399b668f6bfaa8d6d97093d3553ab38e73eb46",
       "kind": "transparent"
     },
     {
       "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "txHash": "0x4a332d172abd2af1eb4a45d4b2a9686ff984a6dfc7b7750616f7c1e20fa0871b",
+      "txHash": "0x4b3c61e0b20f34a6e458c123112f2770010b212e31ea34d149755274b6f8693e",
       "kind": "uups"
     }
   ],
   "impls": {
     "25ab39ccd367cff140791b606c302ba19545d4a4a951c63ecd2faf5e9509e67c": {
       "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-      "txHash": "0x77982b8f6e378e7d473352da90c5eee4baedfa10ad5db39d47c6f0cc49509042",
+      "txHash": "0x00b7d096892a74695c68b805b2acddf769a6447df8fa11f48848914c0be8db88",
       "layout": {
         "storage": [
           {
@@ -53,9 +53,9 @@
             "label": "ExternalTokenMap",
             "offset": 0,
             "slot": "1",
-            "type": "t_mapping(t_bytes32,t_struct(ExternalToken)5997_storage)",
+            "type": "t_mapping(t_bytes32,t_struct(ExternalToken)5988_storage)",
             "contract": "ExternalTokenStorage",
-            "src": "contracts\\Storage.sol:120"
+            "src": "contracts\\Storage.sol:119"
           }
         ],
         "types": {
@@ -79,11 +79,11 @@
             "label": "bytes32",
             "numberOfBytes": "32"
           },
-          "t_mapping(t_bytes32,t_struct(ExternalToken)5997_storage)": {
+          "t_mapping(t_bytes32,t_struct(ExternalToken)5988_storage)": {
             "label": "mapping(bytes32 => struct ExternalToken)",
             "numberOfBytes": "32"
           },
-          "t_struct(ExternalToken)5997_storage": {
+          "t_struct(ExternalToken)5988_storage": {
             "label": "struct ExternalToken",
             "members": [
               {
@@ -132,7 +132,7 @@
     },
     "17bffc38c578e50b26edb25712829d7c2ede5dc02a0901f5b64daf3790517728": {
       "address": "0x0165878A594ca255338adfa4d48449f69242Eb8F",
-      "txHash": "0x67ab143bd52fd25c7c77aa9dc498def6a4ac30e6bde426f7babce7864d29b755",
+      "txHash": "0x87bbb7de8cb41038cb49859bd0feed571e1fd2d9128ba7462321e6d3799f6625",
       "layout": {
         "storage": [
           {
@@ -158,7 +158,7 @@
             "slot": "1",
             "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)",
             "contract": "ActiveTokenStorage",
-            "src": "contracts\\Storage.sol:208"
+            "src": "contracts\\Storage.sol:207"
           }
         ],
         "types": {
@@ -189,110 +189,9 @@
         }
       }
     },
-    "7826ebd57d89ea28c76bb0eb1b1da22b1cc15d9bb0cda51f6c5f1257e4c72216": {
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "txHash": "0x24b8fc3db9ef4001a8395dd3afad8aa17ed4a85bac66c5140bb350bba43e9f74",
-      "layout": {
-        "storage": [
-          {
-            "label": "_initialized",
-            "offset": 0,
-            "slot": "0",
-            "type": "t_uint8",
-            "contract": "Initializable",
-            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
-            "retypedFrom": "bool"
-          },
-          {
-            "label": "_initializing",
-            "offset": 1,
-            "slot": "0",
-            "type": "t_bool",
-            "contract": "Initializable",
-            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
-          },
-          {
-            "label": "InternalTokenMap",
-            "offset": 0,
-            "slot": "1",
-            "type": "t_mapping(t_uint256,t_struct(InternalToken)6010_storage)",
-            "contract": "InternalTokenStorage",
-            "src": "contracts\\Storage.sol:11"
-          }
-        ],
-        "types": {
-          "t_address": {
-            "label": "address",
-            "numberOfBytes": "20"
-          },
-          "t_bool": {
-            "label": "bool",
-            "numberOfBytes": "1"
-          },
-          "t_bytes32": {
-            "label": "bytes32",
-            "numberOfBytes": "32"
-          },
-          "t_mapping(t_uint256,t_struct(InternalToken)6010_storage)": {
-            "label": "mapping(uint256 => struct InternalToken)",
-            "numberOfBytes": "32"
-          },
-          "t_struct(InternalToken)6010_storage": {
-            "label": "struct InternalToken",
-            "members": [
-              {
-                "label": "id",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "0"
-              },
-              {
-                "label": "owner",
-                "type": "t_address",
-                "offset": 0,
-                "slot": "1"
-              },
-              {
-                "label": "portion",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "2"
-              },
-              {
-                "label": "hasBeenAltered",
-                "type": "t_bool",
-                "offset": 0,
-                "slot": "3"
-              },
-              {
-                "label": "externalTokenHash",
-                "type": "t_bytes32",
-                "offset": 0,
-                "slot": "4"
-              },
-              {
-                "label": "parentId",
-                "type": "t_uint256",
-                "offset": 0,
-                "slot": "5"
-              }
-            ],
-            "numberOfBytes": "192"
-          },
-          "t_uint256": {
-            "label": "uint256",
-            "numberOfBytes": "32"
-          },
-          "t_uint8": {
-            "label": "uint8",
-            "numberOfBytes": "1"
-          }
-        }
-      }
-    },
     "fc26df70f13d67733767253269019ddb25563d6632cf726a16c7cc00254b734b": {
       "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
-      "txHash": "0x0b3bbdc9610c3055206a7b95ed0b62f9573a56041e4646d0e57ad492a9a4f36f",
+      "txHash": "0x6ebe9745923c21cb93d0f77c5b1dce7017722b66dc507f97d258d066cae0aab1",
       "layout": {
         "storage": [
           {
@@ -543,6 +442,107 @@
               }
             ],
             "numberOfBytes": "64"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "6aed7db20635400413894241183c62c7e73a8a6ce81f10344fe5d364ab80e755": {
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "txHash": "0x62ce70b8e7a732e46187b743d7c9dd426c1ecccb3fa73e17be3e482e30473298",
+      "layout": {
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin\\contracts-upgradeable\\proxy\\utils\\Initializable.sol:67"
+          },
+          {
+            "label": "InternalTokenMap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_uint256,t_struct(InternalToken)6001_storage)",
+            "contract": "InternalTokenStorage",
+            "src": "contracts\\Storage.sol:11"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(InternalToken)6001_storage)": {
+            "label": "mapping(uint256 => struct InternalToken)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(InternalToken)6001_storage": {
+            "label": "struct InternalToken",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "portion",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "hasBeenAltered",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "externalTokenHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "parentId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              }
+            ],
+            "numberOfBytes": "192"
           },
           "t_uint256": {
             "label": "uint256",

@@ -356,7 +356,7 @@ describe("Illegal transactions", function () {
         new_owners = [sender.address];
         new_owners_portion = [1];
         await expect(qubits.connect(sender).splitTokenOwnership(0, new_owners, new_owners_portion))
-            .to.be.revertedWith('Only the owner may split this token');
+            .to.be.revertedWith('Only the owner may call this function');
     }),
 
         it("Should ensure token can't be further split after it has been altered", async function () {
@@ -364,7 +364,7 @@ describe("Illegal transactions", function () {
             let new_owners = [sender.address];
             let new_owners_portion = [1];
             await expect(qubits.connect(sender).splitTokenOwnership(0, new_owners, new_owners_portion))
-                .to.be.revertedWith('Token may not  be altered more than once');
+                .to.be.revertedWith('Token may not be altered more than once');
         }),
 
 
@@ -392,7 +392,7 @@ describe("Illegal transactions", function () {
             new_owners_portion = [1];
 
             await expect(qubits.connect(sender).splitTokenOwnership(5, new_owners, new_owners_portion))
-                .to.be.revertedWith('Incorrect portion allocation. They sum up to more or less than 100%');
+                .to.be.revertedWith('Incorrect portion sum');
 
 
         }),
@@ -438,7 +438,7 @@ describe("Illegal transactions", function () {
 
 
             await expect(qubits.connect(addr1).returnToken(externalTokenHash))
-                .to.be.revertedWith("Only the owner may return this token");
+                .to.be.revertedWith("Only the owner may call this function");
 
         })
 
