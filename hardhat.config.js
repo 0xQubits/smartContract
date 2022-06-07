@@ -1,4 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
+require('@openzeppelin/hardhat-upgrades');
 require('hardhat-contract-sizer');
 require('dotenv').config({path:__dirname+'/.env'});
 

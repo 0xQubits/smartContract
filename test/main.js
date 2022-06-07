@@ -5,8 +5,9 @@ const { expect } = require("chai");
 const { BigNumber } = require("@ethersproject/bignumber");
 const { AddressZero } = require("@ethersproject/constants");
 const { utils } = require("ethers");
-const { bigNumberToNumber, checkSumTotal } = require("./utils");
-const { ethers } = require("hardhat");
+const { bigNumberToNumber, checkSumTotal,makeHash } = require("./utils");
+const { ethers, upgrades } = require("hardhat");
+
 
 let qubits;
 let game;
@@ -32,14 +33,26 @@ before(async function () {
     const UtilsLibraryFactory = await ethers.getContractFactory("Utils");
     utilsLibrary = await UtilsLibraryFactory.deploy();
 
-    const Qubits = await ethers.getContractFactory("Qubits", {
-        libraries: {
-          Utils: utilsLibrary.address,
-        },
-      });
+
+    const InternalTokenStorageFactory = await ethers.getContractFactory("InternalTokenStorage");
+    const ExternalTokenStorageFactory = await ethers.getContractFactory("ExternalTokenStorage");
+    const ActiveTokenStorageFactory = await ethers.getContractFactory("ActiveTokenStorage");
+
+
+    internalTokenStorage = await upgrades.deployProxy(InternalTokenStorageFactory);
+    externalTokenStorage = await upgrades.deployProxy(ExternalTokenStorageFactory);
+    activeTokenStorage = await upgrades.deployProxy(ActiveTokenStorageFactory);
+    
+    const QubitsFactory = await ethers.getContractFactory("Qubits");
+
+    qubits = await upgrades.deployProxy(QubitsFactory,[
+        internalTokenStorage.address,
+        externalTokenStorage.address,
+        activeTokenStorage.address
+    ]);
+
 
     
-    qubits = await Qubits.deploy();
     const Game = await ethers.getContractFactory("Game");
     game = await Game.deploy();
     await qubits.deployed();
@@ -81,9 +94,9 @@ describe("Initialization", function () {
         which will represent 100% ownership of the ExternalToken", async function () {
             const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
             let sender = addr0;
-            let token = await qubits.TokenMap(0);
+            let token = await internalTokenStorage.InternalTokenMap(0);
 
-            let externalTokenHash = await qubits.makeExternalTokenHash(game.address, firstGameTokenId);
+            let externalTokenHash = makeHash(game.address, firstGameTokenId);
             expect(token.owner).to.equal(sender.address);
             expect(token.portion).to.equal(MAX_PORTION);
             expect(token.hasBeenAltered).to.equal(false);
@@ -91,7 +104,7 @@ describe("Initialization", function () {
             expect(token.parentId).to.equal(MAX_INT_BIGNUMBER);
 
             let userActiveTokenArr = [0];
-            let userActiveTokensTx = await qubits.getUserActiveTokens(sender.address);
+            let userActiveTokensTx = await activeTokenStorage.get(sender.address);
             expect(userActiveTokensTx.map(bigNumberToNumber))
                 .to.have.members(userActiveTokenArr);
 
@@ -100,8 +113,8 @@ describe("Initialization", function () {
 
         it("Should ensure that basic ExternalToken data is accurate", async function () {
             let sender = addr0;
-            let externalTokenHash = await qubits.makeExternalTokenHash(game.address, firstGameTokenId);
-            let externalToken = await qubits.getExternalToken(externalTokenHash)
+            let externalTokenHash = makeHash(game.address, firstGameTokenId);
+            let externalToken = await externalTokenStorage.get(externalTokenHash)
 
             expect(externalToken.contract_).to.equal(game.address);
             expect(externalToken.senderArr).to.have.members([sender.address.toString()]);
@@ -232,13 +245,13 @@ describe("Return Token", function () {
 
     it("Should send and return the token", async function () {
         let sender = addr0;
-        let externalTokenHash = qubits.makeExternalTokenHash(game.address, thirdGameTokenId)
+        let externalTokenHash = makeHash(game.address, thirdGameTokenId)
 
 
         let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address, qubits.address, thirdGameTokenId);
         await safeTransferTx.wait();
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(qubits.address);
-        let externalToken = await qubits.getExternalToken(externalTokenHash);
+        let externalToken = await externalTokenStorage.get(externalTokenHash);
         let newTokenId = 9;
         let activeTokenIdsArr = [newTokenId];
         let historyArr = [newTokenId];
@@ -271,7 +284,7 @@ describe("Return Token", function () {
         
 
         activeTokenIdsArr = [];
-        externalToken = await qubits.getExternalToken(externalTokenHash);
+        externalToken = await externalTokenStorage.get(externalTokenHash);
         expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
@@ -280,13 +293,13 @@ describe("Return Token", function () {
 
         it("Should send and return the token the second time", async function () {
             let sender = addr0;
-            let externalTokenHash = qubits.makeExternalTokenHash(game.address, thirdGameTokenId)
+            let externalTokenHash = makeHash(game.address, thirdGameTokenId)
 
 
             let safeTransferTx = await game["safeTransferFrom(address,address,uint256)"](sender.address, qubits.address, thirdGameTokenId);
             await safeTransferTx.wait();
             expect(await game.ownerOf(thirdGameTokenId)).to.equal(qubits.address);
-            let externalToken = await qubits.getExternalToken(externalTokenHash);
+            let externalToken = await externalTokenStorage.get(externalTokenHash);
             let newTokenId = 14;
             let activeTokenIdsArr = [newTokenId];
             let historyArr = [9,10,11,12,13, newTokenId];
@@ -324,7 +337,7 @@ describe("Return Token", function () {
             //     .withArgs(sender.address, AddressZero, newTokenId);
 
             activeTokenIdsArr = [];
-            externalToken = await qubits.getExternalToken(externalTokenHash);
+            externalToken = await externalTokenStorage.get(externalTokenHash);
             expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
             expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
             expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
@@ -418,7 +431,7 @@ describe("Illegal transactions", function () {
 
 
         it("Should ensure that only the owner can return token", async function () {
-            let externalTokenHash = await qubits.makeExternalTokenHash(game.address, thirdGameTokenId);
+            let externalTokenHash = makeHash(game.address, thirdGameTokenId);
             let sender = addr0;
             let initTx = await game["safeTransferFrom(address,address,uint256)"](sender.address, qubits.address, thirdGameTokenId);
             await initTx.wait();
@@ -465,7 +478,7 @@ function checkQubitsTokenProperties(splitTokenId) {
     it("Should ensure that the altered token\
         is no longer modifiable", async function () {
 
-        let dividedToken = await qubits.TokenMap(splitTokenId);
+        let dividedToken = await internalTokenStorage.InternalTokenMap(splitTokenId);
         expect(dividedToken.hasBeenAltered).to.equal(true);
 
     }),
@@ -478,9 +491,9 @@ function checkQubitsTokenProperties(splitTokenId) {
             for (i = startTokenIndex; i < endTokenIndex; i++) {
                 let newOwner = new_owners[i - startTokenIndex];
                 let newOwnerPortion = new_owners_portion[i - startTokenIndex];
-                let newToken = await qubits.TokenMap(i);
+                let newToken = await internalTokenStorage.InternalTokenMap(i);
                 console.log(newToken)
-                let externalTokenHash = await qubits.makeExternalTokenHash(game.address, firstGameTokenId);
+                let externalTokenHash = makeHash(game.address, firstGameTokenId);
 
                 expect(newToken.owner).to.equal(newOwner)
                 expect(newToken.portion).to.equal(newOwnerPortion);
@@ -502,8 +515,8 @@ function checkExternalTokenProperties(
 
     it("Should ensure that an ExternalToken\
         object has all the correct properties", async function () {
-        let externalTokenHash = await qubits.makeExternalTokenHash(game.address, gameTokenId);
-        let externalToken = await qubits.getExternalToken(externalTokenHash);
+        let externalTokenHash = makeHash(game.address, gameTokenId);
+        let externalToken = await externalTokenStorage.get(externalTokenHash);
 
         expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
         expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
@@ -511,7 +524,7 @@ function checkExternalTokenProperties(
     }),
 
         it("Should ensure that the active token array sums up to 100%  ", async function () {
-            let externalTokenHash = await qubits.makeExternalTokenHash(game.address, gameTokenId);
+            let externalTokenHash = makeHash(game.address, gameTokenId);
             checkSumTotal(externalTokenHash);
         })
 }

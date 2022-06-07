@@ -32,7 +32,7 @@ contract Qubits is
     address internalTokenStorageAddress;
 
     // ROLES
-    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    // bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
@@ -63,9 +63,9 @@ contract Qubits is
     }
 
     function initialize(
-        address _activeTokenAddress,
+        address _internalTokenStorageAddress,
         address _externalTokenStorageAddress,
-        address _internalTokenStorageAddress
+        address _activeTokenAddress
     ) public initializer {
         __ERC721_init("Qubits", "QTK");
         __Pausable_init();
@@ -73,7 +73,7 @@ contract Qubits is
         __UUPSUpgradeable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
-        _grantRole(MINTER_ROLE, msg.sender);
+        // _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
 
         activeTokenAddress = _activeTokenAddress;
@@ -127,7 +127,7 @@ contract Qubits is
         );
 
 
-        intTokenContract.checkTransferPermission(_tokenId);
+        intTokenContract.checkTransferPermission(_tokenId,msg.sender);
         intTokenContract.validateTransferParameters(
             _tokenId,
             _new_owners,
@@ -205,7 +205,7 @@ contract Qubits is
         for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
             uint256 tokenId = activeTokenIdsArr[i];
             InternalToken memory intToken = internalStorageContract.get(tokenId);
-            internalStorageContract.checkTransferPermission(tokenId);
+            internalStorageContract.checkTransferPermission(tokenId,msg.sender);
             expectedTotal += intToken.portion;
         }
         assert(expectedTotal == TOTAL);
@@ -274,7 +274,7 @@ contract Qubits is
         uint256 tokenId,
         bytes memory
     ) public virtual override returns (bytes4) {
-        bytes32 externalTokenHash = Utils.makeHash(tokenId);
+        bytes32 externalTokenHash = Utils.makeHash(msg.sender,tokenId);
         initializeExternalToken(msg.sender, from, tokenId, externalTokenHash);
 
         return this.onERC721Received.selector;

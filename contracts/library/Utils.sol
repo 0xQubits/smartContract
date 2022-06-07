@@ -2,12 +2,11 @@
 pragma solidity ^0.8.11;
 
 library Utils {
-    function makeHash(uint256 _tokenId)
-        public
-        view
+    function makeHash(address contract_, uint256 _tokenId)
+        internal
+        pure
         returns (bytes32)
     {
-        // constructs hash from external contract address and token id
-        return keccak256(abi.encodePacked(msg.sender, _tokenId));
+        return keccak256(abi.encodePacked(contract_, _tokenId));
     }
 }

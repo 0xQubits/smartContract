@@ -3,6 +3,7 @@ pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./library/SharedVariable.sol";
+import "hardhat/console.sol";
 
 contract InternalTokenStorage is Initializable {
     // struct and variables
@@ -66,12 +67,13 @@ contract InternalTokenStorage is Initializable {
     // Permission 
 
     function checkTransferPermission(
-        uint _tokenId
+        uint _tokenId,
+        address _owner
     ) public {
         InternalToken memory intToken = InternalTokenMap[_tokenId];
         assert(intToken.owner != address(0));
         require(
-            intToken.owner == msg.sender,
+            intToken.owner == _owner,
             "Only the owner may call this function"
         );
         require(
