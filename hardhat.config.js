@@ -12,24 +12,23 @@ module.exports = {
   defaultNetwork: "hardhat",
   networks: {
     hardhat: {/* allowUnlimitedContractSize:true*/},
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${process.env.ROPSTEN_API_KEY}`,
-      accounts: [`${process.env.ROPSTEN_PRIVATE_KEY}`] ,
+    polygon: {
+      url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`,
+      accounts: [`${DEPLOYMENT_ACCOUNT_PRIVATE_KEY}`] ,
       gasPrice:100000000000,
       timeout:40000000,
-
-    },  
+    },
   },
   // settings:{
   //   optimizer: {
   //     enabled: true,
   //     runs: 20,
   //   },
-  // },
+  // }, 
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
     runOnCompile: true,
     strict: true,
-  },
+  }
 };
