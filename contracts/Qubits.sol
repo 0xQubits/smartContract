@@ -9,9 +9,13 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "./registry/OtherTokenRegistry.sol";
+import "./registry/QubitsTokenRegistry.sol";
+import "./registry/UserQubitsTokenRegistry.sol";
 import "./library/Utils.sol";
-import "./library/SharedVariable.sol";
-import "./Storage.sol";
+import "./common/Variables.sol";
+
+
 
 contract Qubits is
     ERC721Upgradeable,
@@ -23,39 +27,16 @@ contract Qubits is
     using CountersUpgradeable for CountersUpgradeable.Counter;
     CountersUpgradeable.Counter private _tokenIdCounter;
     uint256 public constant DECIMAL = uint256(12);
-    // The value that denotes 100% ownership of an externalToken
+    // This value that denotes 100% ownership of an externalToken
     uint256 public constant TOTAL = uint256(10)**DECIMAL; // 10 ^ 12
 
-    // external contract addresses
-    address activeTokenAddress;
-    address externalTokenStorageAddress;
-    address internalTokenStorageAddress;
+    address userQubitsTokenRegistryAddress;
+    address otherTokenRegistryAddress;
+    address qubitsTokenRegistryAddress;
 
-    // ROLES
-    // bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    uint256 public constant MAX_INT = uint256(2**256 - 1);
 
-    // Events
-    event InitializedExternalToken(
-        address contract_,
-        address sender,
-        uint256 tokenId
-    );
-    event OwnershipModified(
-        address from,
-        address to,
-        uint256 externalTokenId,
-        uint256 portion
-    );
-    event ExternalTokenReturn(
-        address contract_,
-        address owner,
-        uint256 externalTokenId
-    );
-
-    //Errors
-    error UnImplemented();
+    error Disabled();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -63,164 +44,117 @@ contract Qubits is
     }
 
     function initialize(
-        address _internalTokenStorageAddress,
-        address _externalTokenStorageAddress,
-        address _activeTokenAddress
+        address _qubitsTokenRegistryAddress,
+        address _otherTokenRegistryAddress,
+        address _userQubitsTokenRegistryAddress
     ) public initializer {
         __ERC721_init("Qubits", "QTK");
         __Pausable_init();
         __AccessControl_init();
         __UUPSUpgradeable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(PAUSER_ROLE, msg.sender);
-        // _grantRole(MINTER_ROLE, msg.sender);
-        _grantRole(UPGRADER_ROLE, msg.sender);
+        _grantRole(Variables.PAUSER_ROLE, msg.sender);
+        _grantRole(Variables.UPGRADER_ROLE, msg.sender);
 
-        activeTokenAddress = _activeTokenAddress;
-        externalTokenStorageAddress = _externalTokenStorageAddress;
-        internalTokenStorageAddress = _internalTokenStorageAddress;
+        userQubitsTokenRegistryAddress = _userQubitsTokenRegistryAddress;
+        otherTokenRegistryAddress = _otherTokenRegistryAddress;
+        qubitsTokenRegistryAddress = _qubitsTokenRegistryAddress;
     }
 
-    function mintToken(
-        address from,
-        address to,
-        uint256 portion,
-        bytes32 _hash,
-        uint256 parentId
-    ) private returns (uint256) {
-        // This is a private function for token mint
+    
 
-        // using safeMint can lead to unexpected behaviour
-        uint256 tokenId = _tokenIdCounter.current();
-        _mint(to, tokenId);
-        _tokenIdCounter.increment();
 
-        // create internal token object
-        InternalTokenStorage(internalTokenStorageAddress).create(
-            tokenId,
-            to,
-            portion,
-            _hash,
-            parentId
-        );
 
-        //update external token storage
-        uint256 exTokenId = ExternalTokenStorage(externalTokenStorageAddress)
-            .add(_hash, tokenId);
-
-        // update user active token map
-        ActiveTokenStorage(activeTokenAddress).add(to, tokenId);
-
-        emit OwnershipModified(from, to, exTokenId, portion);
-        return tokenId;
-    }
-
+    /**
+     * @dev This is a public function to split ownership of a Qubits token 
+     *
+     * @param splitQubitsTokenId the id of the token to be split
+     * @param newOwners array of new owners addresses
+     * @param newOwnersPortion array of portion of each owner
+     */
     function splitTokenOwnership(
-        uint256 _tokenId,
-        address[] memory _new_owners,
-        uint256[] memory _new_owners_portion
+        uint256 splitQubitsTokenId,
+        address[] memory newOwners,
+        uint256[] memory newOwnersPortion
     ) public whenNotPaused {
-        // This is a public function that spilts ownership of a Qubits token. 
-
-        InternalTokenStorage intTokenContract = InternalTokenStorage(
-            internalTokenStorageAddress
+        QubitsTokenRegistry qTokenContract = QubitsTokenRegistry(
+            qubitsTokenRegistryAddress
+        );
+        qTokenContract.checkTransferPermission(splitQubitsTokenId,msg.sender);
+        qTokenContract.validateTransferParameters(
+            splitQubitsTokenId,
+            newOwners,
+            newOwnersPortion
         );
 
+        Variables.QubitsToken memory qToken = qTokenContract.get(splitQubitsTokenId);
 
-        intTokenContract.checkTransferPermission(_tokenId,msg.sender);
-        intTokenContract.validateTransferParameters(
-            _tokenId,
-            _new_owners,
-            _new_owners_portion
-        );
+        _destroyQubitsToken(splitQubitsTokenId, msg.sender);
 
-        InternalToken memory intToken = intTokenContract.get(_tokenId);
-
-        updateTransferredInternalToken(_tokenId, msg.sender);
-
-        uint256[] memory newlyCreatedTokenIds = new uint256[](
-            _new_owners.length
-        );
-
-        for (uint256 i = 0; i < _new_owners.length; i++) {
-            uint256 new_token_id;
-            new_token_id = mintToken(
-                intToken.owner,
-                _new_owners[i],
-                _new_owners_portion[i],
-                intToken.externalTokenHash,
-                _tokenId
+        uint256[] memory newlyCreatedTokenIds = new uint256[](newOwners.length);
+        for (uint256 i = 0; i < newOwners.length; i++) {
+            uint256 _mintedQubitsTokenId = _mintQubitsToken(
+                newOwners[i],
+                newOwnersPortion[i],
+                qToken.externalTokenHash,
+                splitQubitsTokenId
             );
-            newlyCreatedTokenIds[i] = new_token_id;
+            newlyCreatedTokenIds[i] = _mintedQubitsTokenId;
         }
 
-        // update external token active token ids arr
-        ExternalTokenStorage(externalTokenStorageAddress).update(
-            intToken.externalTokenHash,
-            newlyCreatedTokenIds,
-            _tokenId
+        OtherTokenRegistry(otherTokenRegistryAddress).handleTokenSplit(
+            qToken.externalTokenHash,
+            splitQubitsTokenId,
+            newlyCreatedTokenIds
         );
     }
 
     
 
-    function updateTransferredInternalToken(
-        uint tokenId,
-        address formerOwnerAddress
-        )
-        private
-    {
-        // update state of altered token
-        _burn(tokenId);
 
-        InternalTokenStorage intTokenStorageContract = InternalTokenStorage(internalTokenStorageAddress); 
-        intTokenStorageContract.invalidate(tokenId);
-        ActiveTokenStorage(activeTokenAddress).update(
-            tokenId,
-            formerOwnerAddress
+    /**
+     * @dev This is a public function to take an nft back from 
+     * this contract and back to the contract that sent the token
+     *
+     * Note: The person (address) calling this contract must own all
+     * the active tokens connected to the ReceivedToken
+     */
+    function returnToken(bytes32 otherTokenHash) public whenNotPaused {
+
+        OtherTokenRegistry otherTokenRegistry = OtherTokenRegistry(
+            otherTokenRegistryAddress
         );
-    }
-
-    function returnToken(bytes32 externalTokenHash) public whenNotPaused {
-        // This is a public function to take the token out of
-        // this contract and back to the ExternalToken contract
-
-        // The person calling this contract must own all
-        // the active tokens connected to the ExternalToken
-
-        ExternalTokenStorage externalStorageContract = ExternalTokenStorage(
-            externalTokenStorageAddress
-        );
-        InternalTokenStorage internalStorageContract = InternalTokenStorage(
-            internalTokenStorageAddress
+        QubitsTokenRegistry internalStorageContract = QubitsTokenRegistry(
+            qubitsTokenRegistryAddress
         );
 
-        uint256[] memory activeTokenIdsArr = externalStorageContract
-            .get(externalTokenHash)
+        uint256[] memory activeTokenIdsArr = otherTokenRegistry
+            .get(otherTokenHash)
             .activeTokenIdsArr;
 
         assert(activeTokenIdsArr.length > 0);
+        // assert iswithus
         uint256 expectedTotal = 0;
 
         for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
             uint256 tokenId = activeTokenIdsArr[i];
-            InternalToken memory intToken = internalStorageContract.get(tokenId);
+            Variables.QubitsToken memory qToken = internalStorageContract.get(tokenId);
             internalStorageContract.checkTransferPermission(tokenId,msg.sender);
-            expectedTotal += intToken.portion;
+            expectedTotal += qToken.portion;
         }
         assert(expectedTotal == TOTAL);
 
         assert(activeTokenIdsArr.length > 0);
         for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
             uint256 tokenId = activeTokenIdsArr[i];
-            InternalToken memory intToken = internalStorageContract.get(tokenId);
-            updateTransferredInternalToken(intToken.id, msg.sender);
+            Variables.QubitsToken memory qToken = internalStorageContract.get(tokenId);
+            _destroyQubitsToken(qToken.id, msg.sender);
         }
 
-        externalStorageContract.clearActive(externalTokenHash);
+        otherTokenRegistry.handleTokenExit(otherTokenHash);
 
-        ExternalToken memory externalToken = externalStorageContract.get(
-            externalTokenHash
+        Variables.ReceivedToken memory externalToken = otherTokenRegistry.get(
+            otherTokenHash
         );
         uint256 externalTokenId = externalToken.tokenId;
         address contract_ = externalToken.contract_;
@@ -231,61 +165,124 @@ contract Qubits is
             externalTokenId
         );
 
-        emit ExternalTokenReturn(contract_, msg.sender, externalTokenId);
     }
 
-    function initializeExternalToken(
-        address contract_,
-        address sender,
-        uint256 tokenId,
-        bytes32 externalTokenHash
-    ) private whenNotPaused {
-        // This is a private function to mint a Qubits token
-        // representing 100% ownership of an external
-        // token on receipt of the external token
-        // ExternalToken memory externalToken;
-        ExternalTokenStorage exTokenStorageContract = ExternalTokenStorage(
-            externalTokenStorageAddress
-        );
-        exTokenStorageContract.createStart(
-            externalTokenHash,
-            sender,
-            contract_,
-            tokenId
-        );
 
-        uint256 MAX_INT = uint256(2**256 - 1);
-        uint256 newTokenId = mintToken(
-            sender,
-            sender,
-            TOTAL,
-            externalTokenHash,
-            MAX_INT
-        );
 
-        exTokenStorageContract.createFinish(externalTokenHash, newTokenId);
+ 
 
-        emit InitializedExternalToken(contract_, sender, tokenId);
+    function pause() public onlyRole(Variables.PAUSER_ROLE) {
+        _pause();
     }
 
+    function unpause() public onlyRole(Variables.PAUSER_ROLE) {
+        _unpause();
+    }
+
+    function transferFrom(
+        address /*from*/,
+        address /*to*/,
+        uint256 /*tokenId*/
+    ) public virtual override {
+        revert Disabled();
+    }
+
+    function safeTransferFrom(
+        address /*from*/,
+        address /*to*/,
+        uint256 /*tokenId*/,
+        bytes memory /*_data*/
+    ) public virtual override {
+        revert Disabled();
+    }
     function onERC721Received(
-        address operator,
+        address /*operator*/,
         address from,
         uint256 tokenId,
         bytes memory
     ) public virtual override returns (bytes4) {
-        bytes32 externalTokenHash = Utils.makeHash(msg.sender,tokenId);
-        initializeExternalToken(msg.sender, from, tokenId, externalTokenHash);
+        _receiveNFT(msg.sender, from, tokenId);
 
         return this.onERC721Received.selector;
     }
 
-    function pause() public onlyRole(PAUSER_ROLE) {
-        _pause();
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721Upgradeable, AccessControlUpgradeable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+    /** 
+     * @dev Receive an nft from another smart contract and 
+     * mint a Qubits token representing 100% ownership of a received nft
+     * @param contract_ the contract that called the safeTransferFrom method
+     * @param owner address of nft owner
+     * @param nft - the nft id  
+     */
+    function _receiveNFT(
+        address contract_,
+        address owner,
+        uint256 nft
+    ) private whenNotPaused {
+
+        bytes32 otherTokenHash = Utils.makeHash(msg.sender,nft);
+    
+        uint256 mintedQubitsTokenId = _mintQubitsToken(
+            owner,
+            TOTAL,
+            otherTokenHash,
+            MAX_INT
+        );
+        OtherTokenRegistry(otherTokenRegistryAddress)
+            .handleTokenMint(
+                otherTokenHash,
+                owner, 
+                contract_,
+                nft,
+                mintedQubitsTokenId
+            );
     }
 
-    function unpause() public onlyRole(PAUSER_ROLE) {
-        _unpause();
+    function _mintQubitsToken(
+        address to,
+        uint256 portion,
+        bytes32 hash_,
+        uint256 parentId
+    ) private returns (uint256) {
+        // @note: using safeMint can lead to unexpected behaviour
+        uint256 qubitsTokenId = _tokenIdCounter.current();
+        _mint(to, qubitsTokenId);
+        _tokenIdCounter.increment();
+        QubitsTokenRegistry(qubitsTokenRegistryAddress).create(
+            qubitsTokenId,
+            to,
+            portion,
+            hash_,
+            parentId
+        );
+        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress).add(to, qubitsTokenId);
+        
+        return qubitsTokenId;
+
+    }   
+
+    function _destroyQubitsToken(
+        uint tokenId,
+        address ownerAddress
+        )
+        private
+    {
+        // update state of altered token
+        _burn(tokenId);
+
+        QubitsTokenRegistry qTokenStorageContract = QubitsTokenRegistry(qubitsTokenRegistryAddress); 
+        qTokenStorageContract.invalidate(tokenId);
+        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress).remove(
+            ownerAddress,
+            tokenId
+        );
     }
 
     function _beforeTokenTransfer(
@@ -296,35 +293,11 @@ contract Qubits is
         super._beforeTokenTransfer(from, to, amount);
     }
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public virtual override {
-        revert UnImplemented();
-    }
-
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 tokenId,
-        bytes memory _data
-    ) public virtual override {
-        revert UnImplemented();
-    }
-
     function _authorizeUpgrade(address newImplementation)
         internal
         override
-        onlyRole(UPGRADER_ROLE)
+        onlyRole(Variables.UPGRADER_ROLE)
     {}
 
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721Upgradeable, AccessControlUpgradeable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
+
 }
