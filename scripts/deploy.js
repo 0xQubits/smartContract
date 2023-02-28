@@ -13,34 +13,47 @@ async function main() {
   utilsLibrary = await UtilsLibraryFactory.deploy();
 
 
-  const InternalTokenStorageFactory = await ethers.getContractFactory("InternalTokenStorage");
-  const ExternalTokenStorageFactory = await ethers.getContractFactory("ExternalTokenStorage");
-  const ActiveTokenStorageFactory = await ethers.getContractFactory("ActiveTokenStorage");
+  const QubitsTokenRegistryFactory = await ethers.getContractFactory("QubitsTokenRegistry");
+  const OtherTokenRegistryFactory = await ethers.getContractFactory("OtherTokenRegistry");
+  const UserQubitsTokenRegistryFactory = await ethers.getContractFactory("UserQubitsTokenRegistry");
 
 
-  internalTokenStorage = await upgrades.deployProxy(InternalTokenStorageFactory);
-  externalTokenStorage = await upgrades.deployProxy(ExternalTokenStorageFactory);
-  activeTokenStorage = await upgrades.deployProxy(ActiveTokenStorageFactory);
+  const qubitsTokenRegistry = await upgrades.deployProxy(QubitsTokenRegistryFactory);
+  const otherTokenRegistry = await upgrades.deployProxy(OtherTokenRegistryFactory);
+  const userQubitsTokenRegistry = await upgrades.deployProxy(UserQubitsTokenRegistryFactory);
 
   const QubitsFactory = await ethers.getContractFactory("Qubits");
 
-  qubits = await upgrades.deployProxy(QubitsFactory, [
-    internalTokenStorage.address,
-    externalTokenStorage.address,
-    activeTokenStorage.address
+  const qubits = await upgrades.deployProxy(QubitsFactory, [
+    qubitsTokenRegistry.address,
+    otherTokenRegistry.address,
+    userQubitsTokenRegistry.address
   ]);
 
   await qubits.deployed();
+
+  await qubitsTokenRegistry.setRegistryCaller(
+    qubits.address
+)
+  await otherTokenRegistry.setRegistryCaller(
+      qubits.address
+  )
+  await userQubitsTokenRegistry.setRegistryCaller(
+      qubits.address
+  )
   var addressObj = JSON.stringify({
     qubits: qubits.address,
-    internalTokenStorage: internalTokenStorage.address,
-    externalTokenStorage: externalTokenStorage.address,
-    activeTokenStorage: activeTokenStorage.address
+    qubitsTokenRegistry: qubitsTokenRegistry.address,
+    otherTokenRegistry: otherTokenRegistry.address,
+    userQubitsTokenRegistry: userQubitsTokenRegistry.address
   })
+
   
  
-let data = JSON.stringify(addressObj);
-fs.writeFileSync('deployedAddresses.json', data);
+let data = JSON.parse(JSON.stringify(addressObj)) ;
+  const {chainId} = (await ethers.getSigner())._signer.provider._network
+
+fs.writeFileSync(`deployedAddresses-${chainId}.json`, data);
 console.log("\n\n\n Deployment complete! \n\n\n");
 }
 

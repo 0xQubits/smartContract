@@ -43,6 +43,10 @@ before(async function () {
     otherTokenRegistry = await upgrades.deployProxy(OtherTokenRegistryFactory);
     userQubitsTokenRegistry = await upgrades.deployProxy(UserQubitsTokenRegistryFactory);
     
+    await qubitsTokenRegistry.deployed()
+    await otherTokenRegistry.deployed()
+    await userQubitsTokenRegistry.deployed()
+
     const QubitsFactory = await ethers.getContractFactory("Qubits");
 
     qubits = await upgrades.deployProxy(QubitsFactory,[
@@ -59,6 +63,16 @@ before(async function () {
     await game.deployed();
     console.log("Game ", game.address)
     console.log("Qubits ", qubits.address)
+
+    await qubitsTokenRegistry.setRegistryCaller(
+        qubits.address
+    )
+    await otherTokenRegistry.setRegistryCaller(
+        qubits.address
+    )
+    await userQubitsTokenRegistry.setRegistryCaller(
+        qubits.address
+    )
 
     const mintGameTx = await game.awardItem(sender.address);
     await mintGameTx.wait();
@@ -274,7 +288,7 @@ describe("Return Token", function () {
         historyArr.push(10,11,12,13)
 
 
-        let returnTx = await qubits.connect(sender).returnToken(externalTokenHash);
+        let returnTx = await qubits.connect(sender).restoreTokenOwnership(externalTokenHash);
         
         await expect(returnTx).to.emit(otherTokenRegistry, 'Withdrawn')
             .withArgs(game.address,thirdGameTokenId);
@@ -325,7 +339,7 @@ describe("Return Token", function () {
 
             historyArr.push(15,16,17,18);
 
-            let returnTx = await qubits.connect(sender).returnToken(externalTokenHash);
+            let returnTx = await qubits.connect(sender).restoreTokenOwnership(externalTokenHash);
 
             await expect(returnTx).to.emit(otherTokenRegistry, 'Withdrawn')
             .withArgs(game.address,thirdGameTokenId);
@@ -435,7 +449,7 @@ describe("Illegal transactions", function () {
             await initTx.wait();
 
 
-            await expect(qubits.connect(addr1).returnToken(externalTokenHash))
+            await expect(qubits.connect(addr1).restoreTokenOwnership(externalTokenHash))
                 .to.be.revertedWith("Only the owner may call this function");
 
         })

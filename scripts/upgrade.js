@@ -15,28 +15,38 @@ async function main() {
     console.log("Account balance:", (await deployer.getBalance()).toString());
 
 
-    const InternalTokenStorageFactory = await ethers.getContractFactory("InternalTokenStorage");
-    const ExternalTokenStorageFactory = await ethers.getContractFactory("ExternalTokenStorage");
-    const ActiveTokenStorageFactory = await ethers.getContractFactory("ActiveTokenStorage");
+    const QubitsTokenRegistryFactory = await ethers.getContractFactory("QubitsTokenRegistry");
+    const OtherTokenRegistryFactory = await ethers.getContractFactory("OtherTokenRegistry");
+    const UserQubitsTokenRegistryFactory = await ethers.getContractFactory("UserQubitsTokenRegistry");
     const QubitsFactory = await ethers.getContractFactory("Qubits");
     // get type of variable
 
     internalTokenStorage = await upgrades.upgradeProxy(
         addressObj.internalTokenStorage,
-        InternalTokenStorageFactory
+        QubitsTokenRegistryFactory
     );
     // externalTokenStorage = await upgrades.upgradeProxy(
     //     addressObj.externalTokenStorage,
-    //     ExternalTokenStorageFactory
+    //     OtherTokenRegistryFactory
     // );
     // activeTokenStorage = await upgrades.upgradeProxy(
     //     addressObj.activeTokenStorage,
-    //     ActiveTokenStorageFactory
+    //     UserQubitsTokenRegistryFactory
     // // );
     // qubits = await upgrades.upgradeProxy(
     //     addressObj.qubits,
     //     QubitsFactory
     // );
+
+    // await qubitsTokenRegistry.setRegistryCaller(
+    //     qubits.address
+    // )
+    //   await otherTokenRegistry.setRegistryCaller(
+    //       qubits.address
+    //   )
+    //   await userQubitsTokenRegistry.setRegistryCaller(
+    //       qubits.address
+    //   )
 
     console.log("\n\n\n Upgrade complete! \n\n\n");
 }
