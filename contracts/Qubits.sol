@@ -1,40 +1,49 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721ReceiverUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 import "./registry/OtherTokenRegistry.sol";
 import "./registry/QubitsTokenRegistry.sol";
 import "./registry/UserQubitsTokenRegistry.sol";
-import "./library/Utils.sol";
-import "./common/Variables.sol";
+import "./common/library/Utils.sol";
+import "./common/library/Variables.sol";
+import "./common/abstract/access/CustomAccessUpgradeable.sol";
 
 
-
+/**
+ * @title Qubits 
+ * @author Lanre Ojetokun { lojetokun@gmail.com }
+ * @dev The main contract for receiving and splitting nft ownership
+ * 
+ *  In order to start splitting your nft, you must call the safeTransferFrom method
+ *  of the ERC721 contract that the nft is being transferred from  
+ * [CAUTION] ====
+ *      Only the safeTransferFrom method must be called and not the transferFrom method
+ *      as that is the only way the onERC721Received function of this smart contract will 
+ *      be called, which is where we perform initialization operations
+ *  =====
+ * @dev the main public functions that can be called are:
+ *
+ * (1) splitTokenOwnership: used to split ownership of an already initialized nft
+ *
+ * (2) restoreTokenOwnership: used to return the token from qubits smart contract back to the
+ *                whoever owns 100% of the nft on this smart contract
+ */
 contract Qubits is
     ERC721Upgradeable,
     IERC721ReceiverUpgradeable,
-    PausableUpgradeable,
-    AccessControlUpgradeable,
-    UUPSUpgradeable
+    CustomAccessUpgradeable
 {
     using CountersUpgradeable for CountersUpgradeable.Counter;
     CountersUpgradeable.Counter private _tokenIdCounter;
-    uint256 public constant DECIMAL = uint256(12);
-    // This value that denotes 100% ownership of an externalToken
-    uint256 public constant TOTAL = uint256(10)**DECIMAL; // 10 ^ 12
 
     address userQubitsTokenRegistryAddress;
     address otherTokenRegistryAddress;
     address qubitsTokenRegistryAddress;
 
-    uint256 public constant MAX_INT = uint256(2**256 - 1);
 
     error Disabled();
 
@@ -49,13 +58,7 @@ contract Qubits is
         address _userQubitsTokenRegistryAddress
     ) public initializer {
         __ERC721_init("Qubits", "QTK");
-        __Pausable_init();
-        __AccessControl_init();
-        __UUPSUpgradeable_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(Variables.PAUSER_ROLE, msg.sender);
-        _grantRole(Variables.UPGRADER_ROLE, msg.sender);
-
+        __CustomAccessUpgradeable_init();
         userQubitsTokenRegistryAddress = _userQubitsTokenRegistryAddress;
         otherTokenRegistryAddress = _otherTokenRegistryAddress;
         qubitsTokenRegistryAddress = _qubitsTokenRegistryAddress;
@@ -66,7 +69,7 @@ contract Qubits is
 
 
     /**
-     * @dev This is a public function to split ownership of a Qubits token 
+     * @dev This is an external public function to split ownership of a Qubits token 
      *
      * @param splitQubitsTokenId the id of the token to be split
      * @param newOwners array of new owners addresses
@@ -76,7 +79,7 @@ contract Qubits is
         uint256 splitQubitsTokenId,
         address[] memory newOwners,
         uint256[] memory newOwnersPortion
-    ) public whenNotPaused {
+    ) external whenNotPaused {
         QubitsTokenRegistry qTokenContract = QubitsTokenRegistry(
             qubitsTokenRegistryAddress
         );
@@ -113,13 +116,16 @@ contract Qubits is
 
 
     /**
-     * @dev This is a public function to take an nft back from 
-     * this contract and back to the contract that sent the token
+     * @dev This is an external public function to take an nft back from 
+     * this contract and back to whoever owns 100% of the nft
      *
      * Note: The person (address) calling this contract must own all
-     * the active tokens connected to the ReceivedToken
+     * the active tokens connected to the nft. That is, they have ownership
+     * of tokens that sum up to 100% ownership of the nft
      */
-    function returnToken(bytes32 otherTokenHash) public whenNotPaused {
+    function restoreTokenOwnership(
+        bytes32 otherTokenHash
+        ) external whenNotPaused {
 
         OtherTokenRegistry otherTokenRegistry = OtherTokenRegistry(
             otherTokenRegistryAddress
@@ -142,7 +148,7 @@ contract Qubits is
             internalStorageContract.checkTransferPermission(tokenId,msg.sender);
             expectedTotal += qToken.portion;
         }
-        assert(expectedTotal == TOTAL);
+        assert(expectedTotal == Variables.FULL_OWNERSHIP_VALUE);
 
         assert(activeTokenIdsArr.length > 0);
         for (uint256 i = 0; i < activeTokenIdsArr.length; i++) {
@@ -167,18 +173,10 @@ contract Qubits is
 
     }
 
-
-
- 
-
-    function pause() public onlyRole(Variables.PAUSER_ROLE) {
-        _pause();
-    }
-
-    function unpause() public onlyRole(Variables.PAUSER_ROLE) {
-        _unpause();
-    }
-
+    /** @dev Ensure qubits tokens can't be interacted with
+     * or transferred like any other nft except through the 
+     * other allowed public functions
+     */
     function transferFrom(
         address /*from*/,
         address /*to*/,
@@ -187,6 +185,11 @@ contract Qubits is
         revert Disabled();
     }
 
+
+    /** @dev Ensure qubits tokens can't be interacted with
+     * or transferred like any other nft except through the 
+     * other allowed public functions
+     */
     function safeTransferFrom(
         address /*from*/,
         address /*to*/,
@@ -195,6 +198,7 @@ contract Qubits is
     ) public virtual override {
         revert Disabled();
     }
+
     function onERC721Received(
         address /*operator*/,
         address from,
@@ -202,7 +206,6 @@ contract Qubits is
         bytes memory
     ) public virtual override returns (bytes4) {
         _receiveNFT(msg.sender, from, tokenId);
-
         return this.onERC721Received.selector;
     }
 
@@ -231,9 +234,9 @@ contract Qubits is
     
         uint256 mintedQubitsTokenId = _mintQubitsToken(
             owner,
-            TOTAL,
+            Variables.FULL_OWNERSHIP_VALUE,
             otherTokenHash,
-            MAX_INT
+            Variables.MAX_INT
         );
         OtherTokenRegistry(otherTokenRegistryAddress)
             .handleTokenMint(
@@ -292,12 +295,5 @@ contract Qubits is
     ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, amount);
     }
-
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(Variables.UPGRADER_ROLE)
-    {}
-
 
 }

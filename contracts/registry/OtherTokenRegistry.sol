@@ -1,20 +1,22 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../common/Variables.sol";
-import "hardhat/console.sol";
+import "../common/library/Variables.sol";
+import "../common/abstract/Registry.sol";
 
  
 
 /**
+ * @title OtherTokenRegistry 
+ * @author Lanre Ojetokun { lojetokun@gmail.com }
  * @dev A smart contract for storing details about nfts received by qubits smart contract
  * for the purpose of splitting ownership of the said token
  */
-contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
+contract OtherTokenRegistry is Registry {
 
     mapping(bytes32 => Variables.ReceivedToken) public ReceivedTokenMap;
+
+    /** Event emitted after the ownership structure of an nft has updated */
     event OwnershipChanged(
         address contract_,
         uint256 contractTokenId,
@@ -40,14 +42,9 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
         _disableInitializers();
     }
 
-    function initialize() public initializer {}
-
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(Variables.UPGRADER_ROLE)
-    {}
-
+    function initialize() public initializer {
+        __Registry_init();
+    }
 
     /**
     * @dev Get a received token object using a hash
@@ -57,8 +54,9 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
         return ReceivedTokenMap[keyHash];
     }
 
-
     /**
+    * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
+    *
     * @dev Steps to be taken to update the received
     * token object after a qubits token has been minted
 
@@ -75,7 +73,7 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
         address _contract,
         uint256 _receivedTokenId,
         uint256 _qubitsTokenId
-    ) public {
+    ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
         _addReceivedToken(keyHash, sender, _contract, _receivedTokenId, _qubitsTokenId);
         _updateHistory(keyHash, _qubitsTokenId);
         emit Deposit(_contract, _receivedTokenId);
@@ -83,8 +81,9 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
     
 
 
-
-    /** 
+    /**
+     * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
+     *
      * @dev This operation is only called when an external nft's ownership 
      * is being split. Since the old qubits token is burned whenever ownership is split,
      *  we need to remove the burned qubits token from the active tokens array and add
@@ -100,7 +99,7 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
         uint256 burnedQubitsToken,
         uint256[] memory mintedQubitsTokens
 
-    ) public {
+    ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
         // @security check perms
 
 
@@ -129,12 +128,16 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
 
 
     /**
+    * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
+    *
     * @dev Steps to be taken after a token's ownership
     * has been taken away from qubits smart contract by 
     * a person or entity who has 100% ownership of the token
     * @param keyHash hash to find received token object.The hash is gotten using the Utils.makeHash function
     */
-    function handleTokenExit(bytes32 keyHash) public {
+    function handleTokenExit(
+        bytes32 keyHash
+        ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
         // clear active tokens array
         Variables.ReceivedToken storage rToken  = ReceivedTokenMap[keyHash];
         uint256[] storage activeTokenIdsArr = rToken.activeTokenIdsArr;
@@ -168,7 +171,7 @@ contract OtherTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable{
         address _contract,
         uint256 _receivedTokenId,
         uint256 _qubitsTokenId
-    ) public {
+    ) private {
         Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
         // make sure we don't overwrite 
         // just incase there is a hash collision

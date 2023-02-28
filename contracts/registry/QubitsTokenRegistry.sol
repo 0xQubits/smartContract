@@ -1,15 +1,17 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 
 import "hardhat/console.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../common/Variables.sol";
+import "../common/library/Variables.sol";
+import "../common/abstract/Registry.sol";
+
  
 /**
+ * @title QubitsTokenRegistry
+ * @author Lanre Ojetokun { lojetokun@gmail.com }
  * @dev A smart contract for storing details about internal qubits tokens
  */
-contract QubitsTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable {
+contract QubitsTokenRegistry is Registry {
  
     mapping(uint256 => Variables.QubitsToken) public QubitsTokenMap;
 
@@ -18,14 +20,9 @@ contract QubitsTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable {
         _disableInitializers();
     }
 
-    function initialize() public initializer {}
-
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        override
-        onlyRole(Variables.UPGRADER_ROLE)
-    {}
-
+    function initialize() public initializer {
+        __Registry_init();
+    }
     
     /** 
      * @dev Get the qubits token object
@@ -51,7 +48,9 @@ contract QubitsTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable {
         return qTokens;
     }
 
-    /**
+    /**     
+     * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
+     *
      * @dev Create a token object after a token has been minted and
      * add it to the mapping of token ids to token objects
      */
@@ -61,7 +60,8 @@ contract QubitsTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable {
         uint256 _portion,
         bytes32 _hash,
         uint256 _parentId
-    ) public {
+    ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
+        // @todo should be restricted
         Variables.QubitsToken memory token;
         token.id = _tokenId;
         token.owner = _to;
@@ -73,12 +73,14 @@ contract QubitsTokenRegistry is AccessControlUpgradeable,UUPSUpgradeable {
     }
 
     /**
+     * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
+     *
      * @dev Set the hasBeenAltered property of a token 
      * object to true so that it can not be reassigned
      */
     function invalidate(
         uint256 _tokenId
-    ) public {
+    ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
         Variables.QubitsToken storage qToken = QubitsTokenMap[_tokenId];
         qToken.hasBeenAltered = true;
     }

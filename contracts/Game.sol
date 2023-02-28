@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 // for Game Item
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
@@ -8,7 +8,7 @@ import "hardhat/console.sol";
 
 
 
-
+/** @dev NFT for testing */
 contract Game is ERC721URIStorage {
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
