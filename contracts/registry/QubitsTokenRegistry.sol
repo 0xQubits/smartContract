@@ -61,7 +61,6 @@ contract QubitsTokenRegistry is Registry {
         bytes32 _hash,
         uint256 _parentId
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
-        // @todo should be restricted
         Variables.QubitsToken memory token;
         token.id = _tokenId;
         token.owner = _to;

@@ -100,8 +100,6 @@ contract OtherTokenRegistry is Registry {
         uint256[] memory mintedQubitsTokens
 
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
-        // @security check perms
-
 
         assert(mintedQubitsTokens.length > 0);
         uint256[] storage activeTokenIds = ReceivedTokenMap[keyHash].activeTokenIdsArr;
