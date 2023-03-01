@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 
-import "hardhat/console.sol";
 import "../common/abstract/Registry.sol";
 import "../common/library/Variables.sol";
  

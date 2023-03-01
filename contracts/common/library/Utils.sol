@@ -16,4 +16,8 @@ library Utils {
     {
         return keccak256(abi.encodePacked(_contract, _tokenId));
     }
+
+    function isEmpty(uint[] memory array) internal pure returns (bool){
+        return (array.length == 0);
+    }
 }

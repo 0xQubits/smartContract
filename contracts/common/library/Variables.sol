@@ -39,7 +39,7 @@ library Variables{
         /** Whether or not token is still owned
          *  by qubits smart contract 
          */
-        bool isWithUs;
+        bool initialized;
     }
 
     /**

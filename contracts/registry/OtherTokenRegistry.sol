@@ -2,6 +2,7 @@
 pragma solidity ^0.8.11;
 
 import "../common/library/Variables.sol";
+import "../common/library/Utils.sol";
 import "../common/abstract/Registry.sol";
 
  
@@ -55,27 +56,44 @@ contract OtherTokenRegistry is Registry {
     }
 
     /**
+    * @dev Check if a token is initialized
+    * @param keyHash - the hash for getting the token object.
+    * The hash is gotten using the Utils.makeHash function   
+    */
+    function isInitialized(bytes32 keyHash) public view returns (bool) {
+        return ReceivedTokenMap[keyHash].initialized;
+    }
+
+    /**
+    * @dev Check if a token is initialized
+    * @param rToken - the token 
+    */
+    function isInitialized(Variables.ReceivedToken memory rToken) public pure returns (bool) {
+        return rToken.initialized;
+    }
+
+    /**
     * @dev PROTECTED - onlyRole Variables.REGISTRY_ADMIN_ROLE
     *
     * @dev Steps to be taken to update the received
-    * token object after a qubits token has been minted
+    * token object after an nft is sent to qubits
 
     * @param keyHash - the hash for getting the token object.
     * The hash is gotten using the Utils.makeHash function
     * @param sender - the sender of the the nft to qubits contract
     * @param _contract - the external nft's contract address
     * @param _receivedTokenId - the external nft's token id
-    * @param _qubitsTokenId - the qubits token minted in relation to the nft used to signify the percentage of ownernship of the external nft
+    * @param _qubitsTokenId - the first qubits token minted in relation to the nft used to signify 100% ownernship of the external nft
     */
-    function handleTokenMint(
+    function handleTokenInitialization(
         bytes32 keyHash,
         address sender,
         address _contract,
         uint256 _receivedTokenId,
         uint256 _qubitsTokenId
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
-        _addReceivedToken(keyHash, sender, _contract, _receivedTokenId, _qubitsTokenId);
-        _updateHistory(keyHash, _qubitsTokenId);
+        _handleTokenInitialization(keyHash, sender, _contract, _receivedTokenId, _qubitsTokenId);
+
         emit Deposit(_contract, _receivedTokenId);
     }
     
@@ -92,7 +110,7 @@ contract OtherTokenRegistry is Registry {
      * @param keyHash - the hash for getting the token object.
      * The hash is gotten using the Utils.makeHash function
      * @param burnedQubitsToken- the qubits token id being burned
-     * @param mintedQubitsTokens- the newly minted qubits token ids
+     * @param mintedQubitsTokens[]- the newly minted qubits token ids
      */
     function handleTokenSplit(
         bytes32 keyHash,
@@ -143,11 +161,10 @@ contract OtherTokenRegistry is Registry {
         for (uint256 i = 0; i < len; i++) {
             activeTokenIdsArr.pop();
         }
-        assert(activeTokenIdsArr.length == 0);
+        assert(Utils.isEmpty(activeTokenIdsArr));
 
-        // show that token is no longer 
-        // owned by qubits smart contract
-        rToken.isWithUs = false;
+        // set initialized to false
+        _setInitialized(keyHash, false);
         emit Withdrawn(rToken.contract_, rToken.tokenId);
     }
 
@@ -163,7 +180,7 @@ contract OtherTokenRegistry is Registry {
     * @param _receivedTokenId - the external nft's token id
     * @param _qubitsTokenId - the qubits token minted in relation to the nft used to signify the percentage of ownernship of the external nft
     */
-    function _addReceivedToken(
+    function _handleTokenInitialization(
         bytes32 keyHash,
         address sender,
         address _contract,
@@ -178,18 +195,38 @@ contract OtherTokenRegistry is Registry {
             rToken.tokenId = _receivedTokenId;
         }
 
-        // set the active token array if 
-        // token is just being initialized
-        assert(rToken.isWithUs == false);
-        assert(rToken.activeTokenIdsArr.length == 0);
+        // set the active token array
+        assert(Utils.isEmpty(rToken.activeTokenIdsArr));
         rToken.activeTokenIdsArr = [_qubitsTokenId];
-        rToken.isWithUs = true;
-        
+
         // update sender array
-        rToken.senderArr.push(sender);
+        rToken.senderArr.push(sender);  
 
         // update object in mapping
         ReceivedTokenMap[keyHash] = rToken;
+
+        // set initialized
+        _setInitialized(keyHash, true);
+
+        // update history
+        _updateHistory(keyHash, _qubitsTokenId);
+
+
+
+    }
+
+
+    /**
+    * @dev Set nft initilization
+    *
+    * @param keyHash - the hash for getting the token object.
+    * The hash is gotten using the Utils.makeHash function
+    * @param value - true if token is with us else false
+    */
+    function _setInitialized(bytes32 keyHash, bool value) private {
+        Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
+        assert(rToken.initialized != value);
+        rToken.initialized = value;
     }
 
 
@@ -200,7 +237,7 @@ contract OtherTokenRegistry is Registry {
     ) private {
         // update operation 
         Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
-        assert(rToken.isWithUs == true);
+        assert(isInitialized(rToken));
 
         // update history
         rToken.historyArr.push(_qubitsTokenId);

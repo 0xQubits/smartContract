@@ -12,7 +12,6 @@ import "./common/library/Utils.sol";
 import "./common/library/Variables.sol";
 import "./common/abstract/access/CustomAccessUpgradeable.sol";
 
-
 /**
  * @title Qubits 
  * @author Lanre Ojetokun { lojetokun@gmail.com }
@@ -164,8 +163,8 @@ contract Qubits is
         );
         uint256 externalTokenId = externalToken.tokenId;
         address contract_ = externalToken.contract_;
-        ERC721 externalTokenContract = ERC721(contract_);
-        externalTokenContract.transferFrom(
+        ERC721 nftContract = ERC721(contract_);
+        nftContract.transferFrom(
             address(this),
             msg.sender,
             externalTokenId
@@ -205,6 +204,19 @@ contract Qubits is
         uint256 tokenId,
         bytes memory
     ) public virtual override returns (bytes4) {
+
+        /// custom-security: If this function is called manually
+        /// by a sender that is not a contract, execution will be reverted.
+        ///
+        /// If it called manually by a smart contract, which hasn't already 
+        /// sent this token to qubits, the call will fail the ERC721(msg.sender).ownerOf test
+        ///
+        try ERC721(msg.sender).ownerOf(tokenId) returns (address _owner) {
+            require(_owner == address(this),"Token not received");   
+        } catch {
+            revert("Non ERC721 implementer");
+        }
+    
         _receiveNFT(msg.sender, from, tokenId);
         return this.onERC721Received.selector;
     }
@@ -217,6 +229,8 @@ contract Qubits is
     {
         return super.supportsInterface(interfaceId);
     }
+
+
     /** 
      * @dev Receive an nft from another smart contract and 
      * mint a Qubits token representing 100% ownership of a received nft
@@ -231,7 +245,11 @@ contract Qubits is
     ) private whenNotPaused {
 
         bytes32 otherTokenHash = Utils.makeHash(msg.sender,nft);
-    
+        require(
+            !OtherTokenRegistry(otherTokenRegistryAddress).isInitialized(otherTokenHash),
+            "Already Initialized"
+        );
+
         uint256 mintedQubitsTokenId = _mintQubitsToken(
             owner,
             Variables.FULL_OWNERSHIP_VALUE,
@@ -239,7 +257,7 @@ contract Qubits is
             Variables.MAX_INT
         );
         OtherTokenRegistry(otherTokenRegistryAddress)
-            .handleTokenMint(
+            .handleTokenInitialization(
                 otherTokenHash,
                 owner, 
                 contract_,
@@ -258,14 +276,17 @@ contract Qubits is
         uint256 qubitsTokenId = _tokenIdCounter.current();
         _mint(to, qubitsTokenId);
         _tokenIdCounter.increment();
-        QubitsTokenRegistry(qubitsTokenRegistryAddress).create(
-            qubitsTokenId,
-            to,
-            portion,
-            hash_,
-            parentId
-        );
-        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress).add(to, qubitsTokenId);
+
+        QubitsTokenRegistry(qubitsTokenRegistryAddress)
+            .create(
+                qubitsTokenId,
+                to,
+                portion,
+                hash_,
+                parentId
+            );
+        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress)
+            .add(to, qubitsTokenId);
         
         return qubitsTokenId;
 
@@ -277,15 +298,15 @@ contract Qubits is
         )
         private
     {
-        // update state of altered token
         _burn(tokenId);
 
-        QubitsTokenRegistry qTokenStorageContract = QubitsTokenRegistry(qubitsTokenRegistryAddress); 
-        qTokenStorageContract.invalidate(tokenId);
-        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress).remove(
-            ownerAddress,
-            tokenId
-        );
+        QubitsTokenRegistry(qubitsTokenRegistryAddress)
+            .invalidate(tokenId);
+        UserQubitsTokenRegistry(userQubitsTokenRegistryAddress)
+            .remove(
+                ownerAddress,
+                tokenId
+            );
     }
 
     function _beforeTokenTransfer(

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: CC-BY-NC-4.0
 pragma solidity ^0.8.11;
 
-import "hardhat/console.sol";
 import "../common/library/Variables.sol";
 import "../common/abstract/Registry.sol";
 
@@ -61,14 +60,14 @@ contract QubitsTokenRegistry is Registry {
         bytes32 _hash,
         uint256 _parentId
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
-        Variables.QubitsToken memory token;
-        token.id = _tokenId;
-        token.owner = _to;
-        token.portion = _portion;
-        token.hasBeenAltered = false;
-        token.externalTokenHash = _hash;
-        token.parentId = _parentId;
-        QubitsTokenMap[_tokenId] = token;
+        Variables.QubitsToken memory qToken;
+        qToken.id = _tokenId;
+        qToken.owner = _to;
+        qToken.portion = _portion;
+        qToken.hasBeenAltered = false;
+        qToken.externalTokenHash = _hash;
+        qToken.parentId = _parentId;
+        QubitsTokenMap[_tokenId] = qToken;
     }
 
     /**

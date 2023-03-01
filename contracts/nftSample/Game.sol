@@ -3,7 +3,6 @@ pragma solidity ^0.8.11;
 // for Game Item
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "hardhat/console.sol";
 
 
 
