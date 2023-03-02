@@ -15,7 +15,7 @@ import "../common/abstract/Registry.sol";
  */
 contract OtherTokenRegistry is Registry {
 
-    mapping(bytes32 => Variables.ReceivedToken) public ReceivedTokenMap;
+    mapping(bytes32 => Variables.OtherToken) public OtherTokenMap;
 
     /** Event emitted after the ownership structure of an nft has updated */
     event OwnershipChanged(
@@ -51,8 +51,8 @@ contract OtherTokenRegistry is Registry {
     * @dev Get a received token object using a hash
     * @param keyHash - the hash for getting the token object.
     * The hash is gotten using the Utils.makeHash function    */
-    function get(bytes32 keyHash) public view returns (Variables.ReceivedToken memory) {
-        return ReceivedTokenMap[keyHash];
+    function get(bytes32 keyHash) public view returns (Variables.OtherToken memory) {
+        return OtherTokenMap[keyHash];
     }
 
     /**
@@ -61,15 +61,15 @@ contract OtherTokenRegistry is Registry {
     * The hash is gotten using the Utils.makeHash function   
     */
     function isInitialized(bytes32 keyHash) public view returns (bool) {
-        return ReceivedTokenMap[keyHash].initialized;
+        return OtherTokenMap[keyHash].initialized;
     }
 
     /**
     * @dev Check if a token is initialized
-    * @param rToken - the token 
+    * @param otherToken - the token 
     */
-    function isInitialized(Variables.ReceivedToken memory rToken) public pure returns (bool) {
-        return rToken.initialized;
+    function isInitialized(Variables.OtherToken memory otherToken) public pure returns (bool) {
+        return otherToken.initialized;
     }
 
     /**
@@ -120,7 +120,7 @@ contract OtherTokenRegistry is Registry {
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
 
         assert(mintedQubitsTokens.length > 0);
-        uint256[] storage activeTokenIds = ReceivedTokenMap[keyHash].activeTokenIdsArr;
+        uint256[] storage activeTokenIds = OtherTokenMap[keyHash].activeQubitsTokens;
         for (uint256 i = 0; i < activeTokenIds.length; i++) {
             uint256 tokenId = activeTokenIds[i];
             if (tokenId == burnedQubitsToken) {
@@ -155,17 +155,17 @@ contract OtherTokenRegistry is Registry {
         bytes32 keyHash
         ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
         // clear active tokens array
-        Variables.ReceivedToken storage rToken  = ReceivedTokenMap[keyHash];
-        uint256[] storage activeTokenIdsArr = rToken.activeTokenIdsArr;
-        uint256 len = activeTokenIdsArr.length;
+        Variables.OtherToken storage otherToken  = OtherTokenMap[keyHash];
+        uint256[] storage activeQubitsTokens = otherToken.activeQubitsTokens;
+        uint256 len = activeQubitsTokens.length;
         for (uint256 i = 0; i < len; i++) {
-            activeTokenIdsArr.pop();
+            activeQubitsTokens.pop();
         }
-        assert(Utils.isEmpty(activeTokenIdsArr));
+        assert(Utils.isEmpty(activeQubitsTokens));
 
         // set initialized to false
         _setInitialized(keyHash, false);
-        emit Withdrawn(rToken.contract_, rToken.tokenId);
+        emit Withdrawn(otherToken.contract_, otherToken.tokenId);
     }
 
 
@@ -187,23 +187,23 @@ contract OtherTokenRegistry is Registry {
         uint256 _receivedTokenId,
         uint256 _qubitsTokenId
     ) private {
-        Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
+        Variables.OtherToken storage otherToken = OtherTokenMap[keyHash];
         // make sure we don't overwrite 
         // just incase there is a hash collision
-        if (rToken.contract_ == address(0)){
-            rToken.contract_ = _contract;
-            rToken.tokenId = _receivedTokenId;
+        if (otherToken.contract_ == address(0)){
+            otherToken.contract_ = _contract;
+            otherToken.tokenId = _receivedTokenId;
         }
 
         // set the active token array
-        assert(Utils.isEmpty(rToken.activeTokenIdsArr));
-        rToken.activeTokenIdsArr = [_qubitsTokenId];
+        assert(Utils.isEmpty(otherToken.activeQubitsTokens));
+        otherToken.activeQubitsTokens = [_qubitsTokenId];
 
-        // update sender array
-        rToken.senderArr.push(sender);  
+        // update initializers array
+        otherToken.initializers.push(sender);  
 
         // update object in mapping
-        ReceivedTokenMap[keyHash] = rToken;
+        OtherTokenMap[keyHash] = otherToken;
 
         // set initialized
         _setInitialized(keyHash, true);
@@ -224,9 +224,9 @@ contract OtherTokenRegistry is Registry {
     * @param value - true if token is with us else false
     */
     function _setInitialized(bytes32 keyHash, bool value) private {
-        Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
-        assert(rToken.initialized != value);
-        rToken.initialized = value;
+        Variables.OtherToken storage otherToken = OtherTokenMap[keyHash];
+        assert(otherToken.initialized != value);
+        otherToken.initialized = value;
     }
 
 
@@ -236,12 +236,12 @@ contract OtherTokenRegistry is Registry {
         uint256 _qubitsTokenId
     ) private {
         // update operation 
-        Variables.ReceivedToken storage rToken = ReceivedTokenMap[keyHash];
-        assert(isInitialized(rToken));
+        Variables.OtherToken storage otherToken = OtherTokenMap[keyHash];
+        assert(isInitialized(otherToken));
 
         // update history
-        rToken.historyArr.push(_qubitsTokenId);
-        emit OwnershipChanged(rToken.contract_,rToken.tokenId,_qubitsTokenId);
+        otherToken.allQubitsTokens.push(_qubitsTokenId);
+        emit OwnershipChanged(otherToken.contract_,otherToken.tokenId,_qubitsTokenId);
 
     }
 

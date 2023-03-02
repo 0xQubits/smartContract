@@ -40,11 +40,11 @@ contract QubitsTokenRegistry is Registry {
         view
         returns (Variables.QubitsToken[] memory)
     {
-        Variables.QubitsToken[] memory qTokens = new Variables.QubitsToken[](_tokenIds.length);
+        Variables.QubitsToken[] memory qubitsTokens = new Variables.QubitsToken[](_tokenIds.length);
         for (uint256 i = 0; i < _tokenIds.length; i++) {
-            qTokens[i] = QubitsTokenMap[_tokenIds[i]];
+            qubitsTokens[i] = QubitsTokenMap[_tokenIds[i]];
         }
-        return qTokens;
+        return qubitsTokens;
     }
 
     /**     
@@ -60,14 +60,14 @@ contract QubitsTokenRegistry is Registry {
         bytes32 _hash,
         uint256 _parentId
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE){
-        Variables.QubitsToken memory qToken;
-        qToken.id = _tokenId;
-        qToken.owner = _to;
-        qToken.portion = _portion;
-        qToken.hasBeenAltered = false;
-        qToken.externalTokenHash = _hash;
-        qToken.parentId = _parentId;
-        QubitsTokenMap[_tokenId] = qToken;
+        Variables.QubitsToken memory qubitsToken;
+        qubitsToken.id = _tokenId;
+        qubitsToken.owner = _to;
+        qubitsToken.portion = _portion;
+        qubitsToken.hasBeenAltered = false;
+        qubitsToken.externalTokenHash = _hash;
+        qubitsToken.parentId = _parentId;
+        QubitsTokenMap[_tokenId] = qubitsToken;
     }
 
     /**
@@ -79,8 +79,8 @@ contract QubitsTokenRegistry is Registry {
     function invalidate(
         uint256 _tokenId
     ) external onlyRole(Variables.REGISTRY_ADMIN_ROLE) {
-        Variables.QubitsToken storage qToken = QubitsTokenMap[_tokenId];
-        qToken.hasBeenAltered = true;
+        Variables.QubitsToken storage qubitsToken = QubitsTokenMap[_tokenId];
+        qubitsToken.hasBeenAltered = true;
     }
 
 
@@ -92,14 +92,14 @@ contract QubitsTokenRegistry is Registry {
         uint256 _tokenId,
         address _owner
     ) public view {
-        Variables.QubitsToken memory qToken = QubitsTokenMap[_tokenId];
-        assert(qToken.owner != address(0));
+        Variables.QubitsToken memory qubitsToken = QubitsTokenMap[_tokenId];
+        assert(qubitsToken.owner != address(0));
         require(
-            qToken.owner == _owner,
+            qubitsToken.owner == _owner,
             "Only the owner may call this function"
         );
         require(
-            qToken.hasBeenAltered == false,
+            qubitsToken.hasBeenAltered == false,
             "Token may not be altered more than once"
         );
     }
@@ -117,7 +117,7 @@ contract QubitsTokenRegistry is Registry {
             newOwners.length == newOwnersPortion.length,
             "The portion and address fields must be of equal length"
         );
-        Variables.QubitsToken memory qToken = QubitsTokenMap[_tokenId];
+        Variables.QubitsToken memory qubitsToken = QubitsTokenMap[_tokenId];
 
         uint256 total = 0;
         for (uint256 i = 0; i < newOwners.length; i++) {
@@ -126,11 +126,11 @@ contract QubitsTokenRegistry is Registry {
                 "Invalid recepient address included"
             );
             require(
-                newOwnersPortion[i] <= qToken.portion,
+                newOwnersPortion[i] <= qubitsToken.portion,
                 "You can't transfer more than 100% of your holding"
             );
             total += newOwnersPortion[i];
         }
-        require(total == qToken.portion,"Incorrect portion sum");
+        require(total == qubitsToken.portion,"Incorrect portion sum");
     }
 }
