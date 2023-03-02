@@ -11,6 +11,7 @@ const { ethers, upgrades } = require("hardhat");
 
 let qubits;
 let game;
+let maliciousGame;
 let addr0;
 let addr1;
 let addr2;
@@ -25,7 +26,7 @@ let startTokenIndex;
 let endTokenIndex;
 const MAX_PORTION = 10 ** 12;
 const MAX_INT = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
-const MINTER_ROLE = "0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a"
+const PAUSER_ROLE = "0x65d7a28e3265b37a6474929f336521b332c1681b933f6cb9f3376673440d862a"
 before(async function () {
 
     [addr0, addr1, addr2, addr3, ...addrs] = await ethers.getSigners();
@@ -59,18 +60,23 @@ before(async function () {
     
     const Game = await ethers.getContractFactory("Game");
     game = await Game.deploy();
+
+    const MaliciousGame = await ethers.getContractFactory("MaliciousGame");
+    maliciousGame = await MaliciousGame.deploy();
+
     await qubits.deployed();
     await game.deployed();
+    await maliciousGame.deployed();
     console.log("Game ", game.address)
     console.log("Qubits ", qubits.address)
 
-    await qubitsTokenRegistry.setRegistryCaller(
+    await qubitsTokenRegistry.setRegistryAdmin(
         qubits.address
     )
-    await otherTokenRegistry.setRegistryCaller(
+    await otherTokenRegistry.setRegistryAdmin(
         qubits.address
     )
-    await userQubitsTokenRegistry.setRegistryCaller(
+    await userQubitsTokenRegistry.setRegistryAdmin(
         qubits.address
     )
 
@@ -86,6 +92,11 @@ before(async function () {
     expect(await game.ownerOf(firstGameTokenId)).to.equal(sender.address);
     expect(await game.ownerOf(secondGameTokenId)).to.equal(sender.address);
     expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
+
+    const mintMaliciousGameTx = await maliciousGame.awardItem(sender.address);
+    await mintMaliciousGameTx.wait();
+    expect(await maliciousGame.ownerOf(0)).to.equal(sender.address);
+
 });
 
 
@@ -105,7 +116,7 @@ describe("Initialization", function () {
 
 
         it("Should ensure that a Qubits token object is created \
-        which will represent 100% ownership of the ReceivedToken", async function () {
+        which will represent 100% ownership of the OtherToken", async function () {
             const MAX_INT_BIGNUMBER = BigNumber.from(MAX_INT);
             let sender = addr0;
             let token = await qubitsTokenRegistry.QubitsTokenMap(0);
@@ -125,22 +136,22 @@ describe("Initialization", function () {
 
         }),
 
-        it("Should ensure that basic ReceivedToken data is accurate", async function () {
+        it("Should ensure that basic OtherToken data is accurate", async function () {
             let sender = addr0;
             let externalTokenHash = makeHash(game.address, firstGameTokenId);
             let externalToken = await otherTokenRegistry.get(externalTokenHash)
 
             expect(externalToken.contract_).to.equal(game.address);
-            expect(externalToken.senderArr).to.have.members([sender.address.toString()]);
+            expect(externalToken.initializers).to.have.members([sender.address.toString()]);
             expect(externalToken.tokenId.toNumber()).to.equal(gameTokenId);
 
         })
 
 
-    checkReceivedTokenProperties(
+    checkOtherTokenProperties(
         gameTokenId = 0,
-        historyArr = [0],
-        activeTokenIdsArr = [0]
+        allQubitsTokens = [0],
+        activeQubitsTokens = [0]
     );
 
 
@@ -173,10 +184,10 @@ describe("Split", function () {
 
     })
     checkQubitsTokenProperties(splitTokenId);
-    checkReceivedTokenProperties(
+    checkOtherTokenProperties(
         gameTokenId = 0,
-        historyArr = [0, 1, 2, 3, 4],
-        activeTokenIdsArr = [1, 2, 3, 4]
+        allQubitsTokens = [0, 1, 2, 3, 4],
+        activeQubitsTokens = [1, 2, 3, 4]
     );
 
 
@@ -208,10 +219,10 @@ describe("Further split", function () {
     })
 
     checkQubitsTokenProperties(splitTokenId);
-    checkReceivedTokenProperties(
+    checkOtherTokenProperties(
         gameTokenId = 0,
-        historyArr = [0, 1, 2, 3, 4, 5, 6],
-        activeTokenIdsArr = [2, 3, 4, 5, 6]
+        allQubitsTokens = [0, 1, 2, 3, 4, 5, 6],
+        activeQubitsTokens = [2, 3, 4, 5, 6]
     );
 
 
@@ -238,10 +249,10 @@ describe("Further split with different account", function () {
 
     })
     checkQubitsTokenProperties(splitTokenId);
-    checkReceivedTokenProperties(
+    checkOtherTokenProperties(
         gameTokenId = 0,
-        historyArr = [0, 1, 2, 3, 4, 5, 6, 7, 8],
-        activeTokenIdsArr = [3, 4, 5, 6, 7, 8]
+        allQubitsTokens = [0, 1, 2, 3, 4, 5, 6, 7, 8],
+        activeQubitsTokens = [3, 4, 5, 6, 7, 8]
     );
 
 
@@ -263,10 +274,10 @@ describe("Return Token", function () {
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(qubits.address);
         let externalToken = await otherTokenRegistry.get(externalTokenHash);
         let newTokenId = 9;
-        let activeTokenIdsArr = [newTokenId];
-        let historyArr = [newTokenId];
-        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
-        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+        let activeQubitsTokens = [newTokenId];
+        let allQubitsTokens = [newTokenId];
+        expect(externalToken.activeQubitsTokens.map(bigNumberToNumber)).to.have.members(activeQubitsTokens);
+        expect(externalToken.allQubitsTokens.map(bigNumberToNumber)).to.have.members(allQubitsTokens);
 
 
         // split token
@@ -285,7 +296,7 @@ describe("Return Token", function () {
         );
         await splitTx2.wait();
 
-        historyArr.push(10,11,12,13)
+        allQubitsTokens.push(10,11,12,13)
 
 
         let returnTx = await qubits.connect(sender).restoreTokenOwnership(externalTokenHash);
@@ -293,10 +304,10 @@ describe("Return Token", function () {
         await expect(returnTx).to.emit(otherTokenRegistry, 'Withdrawn')
             .withArgs(game.address,thirdGameTokenId);
 
-        activeTokenIdsArr = [];
+        activeQubitsTokens = [];
         externalToken = await otherTokenRegistry.get(externalTokenHash);
-        expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
-        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+        expect(externalToken.activeQubitsTokens).to.have.members(activeQubitsTokens);
+        expect(externalToken.allQubitsTokens.map(bigNumberToNumber)).to.have.members(allQubitsTokens);
         expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
     }),
 
@@ -311,15 +322,15 @@ describe("Return Token", function () {
             expect(await game.ownerOf(thirdGameTokenId)).to.equal(qubits.address);
             let externalToken = await otherTokenRegistry.get(externalTokenHash);
             let newTokenId = 14;
-            let activeTokenIdsArr = [newTokenId];
-            let historyArr = [9,10,11,12,13, newTokenId];
-            let senderArr = [
+            let activeQubitsTokens = [newTokenId];
+            let allQubitsTokens = [9,10,11,12,13, newTokenId];
+            let initializers = [
                 sender.address.toString(),
                 sender.address.toString()
             ];
-            expect(externalToken.senderArr).to.have.members(senderArr);
-            expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
-            expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+            expect(externalToken.initializers).to.have.members(initializers);
+            expect(externalToken.activeQubitsTokens.map(bigNumberToNumber)).to.have.members(activeQubitsTokens);
+            expect(externalToken.allQubitsTokens.map(bigNumberToNumber)).to.have.members(allQubitsTokens);
 
             // split token
             let splitTx = await qubits.splitTokenOwnership(
@@ -337,7 +348,7 @@ describe("Return Token", function () {
             );
             await splitTx2.wait();
 
-            historyArr.push(15,16,17,18);
+            allQubitsTokens.push(15,16,17,18);
 
             let returnTx = await qubits.connect(sender).restoreTokenOwnership(externalTokenHash);
 
@@ -348,10 +359,10 @@ describe("Return Token", function () {
             // await expect(returnTx).to.emit(qubits, 'Transfer')
             //     .withArgs(sender.address, AddressZero, newTokenId);
 
-            activeTokenIdsArr = [];
+            activeQubitsTokens = [];
             externalToken = await otherTokenRegistry.get(externalTokenHash);
-            expect(externalToken.activeTokenIdsArr).to.have.members(activeTokenIdsArr);
-            expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
+            expect(externalToken.activeQubitsTokens).to.have.members(activeQubitsTokens);
+            expect(externalToken.allQubitsTokens.map(bigNumberToNumber)).to.have.members(allQubitsTokens);
             expect(await game.ownerOf(thirdGameTokenId)).to.equal(sender.address);
 
         })
@@ -412,9 +423,9 @@ describe("Illegal transactions", function () {
 
 
         it("Should ensure that contract can only be paused \
-        by user with MINTER_ROLE", async function () {
+        by user with PAUSER_ROLE", async function () {
             let sender = addr1;
-            let err_msg = `AccessControl: account ${addr1.address.toLowerCase()} is missing role ${MINTER_ROLE}`;
+            let err_msg = `AccessControl: account ${addr1.address.toLowerCase()} is missing role ${PAUSER_ROLE}`;
 
             await expect(qubits.connect(sender).pause())
                 .to.be.revertedWith(err_msg);
@@ -478,6 +489,24 @@ describe("Illegal transactions", function () {
 
     })
 
+    it("should ensure onERC721Received calls from a non ERC721 address to be reverted", async function () {
+        let sender = addr0;
+        await expect(
+            qubits["onERC721Received(address,address,uint256,bytes)"](sender.address, qubits.address, 0, utils.formatBytes32String("random"))
+        )
+        .to.be.reverted;
+    })
+
+    it("should ensure onERC721Received calls from a malicious ERC721 contract to be reverted", async function () {
+        let sender = addr0;
+
+        await expect(
+            maliciousGame["safeTransferFrom(address,address,uint256)"](sender.address, qubits.address, 0)
+        )
+            .to.be.revertedWith("Token not received");
+    })
+ 
+
 
 
 
@@ -519,19 +548,19 @@ function checkQubitsTokenProperties(splitTokenId) {
 }
 
 
-function checkReceivedTokenProperties(
+function checkOtherTokenProperties(
     gameTokenId,
-    historyArr,
-    activeTokenIdsArr
+    allQubitsTokens,
+    activeQubitsTokens
 ) {
 
-    it("Should ensure that an ReceivedToken\
+    it("Should ensure that an OtherToken\
         object has all the correct properties", async function () {
         let externalTokenHash = makeHash(game.address, gameTokenId);
         let externalToken = await otherTokenRegistry.get(externalTokenHash);
 
-        expect(externalToken.historyArr.map(bigNumberToNumber)).to.have.members(historyArr);
-        expect(externalToken.activeTokenIdsArr.map(bigNumberToNumber)).to.have.members(activeTokenIdsArr);
+        expect(externalToken.allQubitsTokens.map(bigNumberToNumber)).to.have.members(allQubitsTokens);
+        expect(externalToken.activeQubitsTokens.map(bigNumberToNumber)).to.have.members(activeQubitsTokens);
 
     }),
 
