@@ -32,13 +32,13 @@ async function main() {
 
   await qubits.deployed();
 
-  await qubitsTokenRegistry.setRegistryCaller(
+  await qubitsTokenRegistry.setRegistryAdmin(
     qubits.address
 )
-  await otherTokenRegistry.setRegistryCaller(
+  await otherTokenRegistry.setRegistryAdmin(
       qubits.address
   )
-  await userQubitsTokenRegistry.setRegistryCaller(
+  await userQubitsTokenRegistry.setRegistryAdmin(
       qubits.address
   )
   var addressObj = JSON.stringify({
