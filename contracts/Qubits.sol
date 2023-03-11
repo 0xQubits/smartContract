@@ -90,6 +90,13 @@ contract Qubits is
     /** @dev Ensure qubits tokens can't be interacted with
      * or transferred like any other nft except through the 
      * other allowed public functions
+     *
+     * [SECURITY CONSIDERATION]
+     * ====
+     * there are two safeTransferFrom methods in the ERC721 parent contract 
+     * and this safeTransferFrom method being overriden is the one that 
+     * takes bytes as a parameter because it is called if either of them is called
+     * ====
      */
     function safeTransferFrom(
         address /*from*/,

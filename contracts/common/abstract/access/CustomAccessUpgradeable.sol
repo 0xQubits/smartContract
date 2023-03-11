@@ -33,7 +33,6 @@ abstract contract CustomAccessUpgradeable is AccessControlUpgradeable,PausableUp
         onlyRole(Variables.UPGRADER_ROLE)
     {}
 
-
     function pause() external onlyRole(Variables.PAUSER_ROLE) {
         _pause();
     }
