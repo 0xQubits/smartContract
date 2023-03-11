@@ -12,9 +12,9 @@ You can interact with the smart contracts at https://0xqubits.com
  <br> 
 
 ### SETUP:
-- create an env file following the env.example file in this directory <br>
-- package installation: $ `npm install` <br>
+- create a file named `env` following the env.example file in this directory <br>
 - source env: $ `source source.sh` <br>
+- package installation: $ `npm install` <br>
 - deployment: $`npx hardhat run scripts/deploy.js --network <network>`<br>
 `note:` available networks can be found in `hardhat.config.js`<br>
 - test: $`npx hardhat test`<br>
